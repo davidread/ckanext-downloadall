@@ -32,17 +32,26 @@
 ckanext-downloadall
 =============
 
-.. Put a description of your extension here:
-   What does it do? What features does it have?
-   Consider including some screenshots or embedding a video!
+This CKAN extension adds a "Download All" button to datasets. This downloads
+a zip file containing all the resource files as well as a datapackage.json.
 
+The datapackage.json is a [Frictionless Data] standard, also known as a Data
+Package.
+
+This extension uses a CKAN background job to create the zip every time a
+dataset is created or updated. This suits CKANs where all files are uploaded -
+if the underlying data file changes without CKAN knowing about it, then the zip
+will not include the update.
+
+(This extension is inspired by
+[ckanext-packagezip](https://github.com/datagovuk/ckanext-packagezip), but that
+is old and relied on ckanext-archiver and IPipe.)
 
 ------------
 Requirements
 ------------
 
-For example, you might want to mention here which versions of CKAN this
-extension works with.
+Designed to work with CKAN 2.7+
 
 
 ------------
@@ -71,24 +80,29 @@ To install ckanext-downloadall:
 
      sudo service apache2 reload
 
+Ensure the background job 'worker' process is running - see
+https://docs.ckan.org/en/2.8/maintaining/background-tasks.html#running-background-jobs
+
 
 ---------------
 Config Settings
 ---------------
 
-Document any optional config settings here. For example::
+None at present
 
-    # The minimum number of hours to wait before re-checking a resource
-    # (optional, default: 24).
-    ckanext.downloadall.some_setting = some_default_value
+.. Document any optional config settings here. For example::
+
+..     # The minimum number of hours to wait before re-checking a resource
+..     # (optional, default: 24).
+..     ckanext.downloadall.some_setting = some_default_value
 
 
 ------------------------
 Development Installation
 ------------------------
 
-To install ckanext-downloadall for development, activate your CKAN virtualenv and
-do::
+To install ckanext-downloadall for development, activate your CKAN virtualenv
+and do::
 
     git clone https://github.com/davidread/ckanext-downloadall.git
     cd ckanext-downloadall
