@@ -2,7 +2,6 @@
 import mock
 from nose.tools import assert_equal
 
-import ckanext.downloadall.plugin as plugin
 from ckan.tests import factories
 from ckan.tests import helpers
 
@@ -28,8 +27,8 @@ class TestNotify(object):
         dataset = factories.Dataset()
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
-             [u'DownloadAll new "{}"'.format(dataset['name']),
-              u'DownloadAll changed "{}"'.format(dataset['name'])])
+            [u'DownloadAll new "{}"'.format(dataset['name']),
+             u'DownloadAll changed "{}"'.format(dataset['name'])])
 
     def test_changed_dataset_leads_to_queued_task(self):
         dataset = factories.Dataset()
@@ -40,7 +39,7 @@ class TestNotify(object):
 
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
-             [u'DownloadAll changed "{}"'.format(dataset['name'])])
+            [u'DownloadAll changed "{}"'.format(dataset['name'])])
 
     @mock.patch('ckan.plugins.toolkit.enqueue_job',
                 side_effect=synchronous_enqueue_job)

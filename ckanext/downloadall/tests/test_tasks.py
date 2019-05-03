@@ -1,6 +1,5 @@
 import __builtin__ as builtins
 import zipfile
-import sys
 
 import mock
 from nose.tools import assert_equal
@@ -8,8 +7,6 @@ from pyfakefs import fake_filesystem
 import responses
 
 from ckan.tests import factories, helpers
-from ckan import plugins as p
-from ckan.plugins import toolkit
 import ckan.lib.uploader
 from ckanext.downloadall.tasks import update_zip
 

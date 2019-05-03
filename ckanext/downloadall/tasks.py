@@ -13,6 +13,7 @@ from ckan.plugins.toolkit import get_action
 
 log = __import__('logging').getLogger(__name__)
 
+
 def update_zip(package_id):
 
     print('Updating zip')
@@ -21,7 +22,7 @@ def update_zip(package_id):
     context = {'model': model, 'session': model.Session}
     dataset = get_action('package_show')(context, {'id': package_id})
 
-    #'filename' = "{0}.zip".format(dataset['name'])
+    # 'filename' = "{0}.zip".format(dataset['name'])
     with tempfile.NamedTemporaryFile() as fp:
         with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED, allowZip64=True) \
                 as zipf:
@@ -56,6 +57,7 @@ def update_zip(package_id):
                         zipf.write(datafile.name, arcname=filename)
                 file_hash = hash_object.hexdigest()
                 # TODO optimize using the file_hash
+                file_hash
             # TODO deal with a dataset with no resources
 
             # write HTML index
@@ -77,7 +79,8 @@ def update_zip(package_id):
             #     if 'detected_format' in res:
             #         del res['detected_format']
 
-            # zipf.writestr('datapackage.json', json.dumps(datapackage, indent=4))
+            # zipf.writestr('datapackage.json',
+            #               json.dumps(datapackage, indent=4))
 
         statinfo = os.stat(fp.name)
         filesize = statinfo.st_size
@@ -105,7 +108,8 @@ def update_zip(package_id):
 
         # package_zip = PackageZip.get_for_package(package_id)
         # if not package_zip:
-        #     PackageZip.create(package_id, filepath, filesize, has_data=any_have_data)
+        #     PackageZip.create(package_id, filepath, filesize,
+        #                       has_data=any_have_data)
         #     log.info('Package zip created: %s', filepath)
         # else:
         #     package_zip.filepath = filepath
@@ -116,26 +120,3 @@ def update_zip(package_id):
 
         #     model.Session.add(package_zip)
         #     model.Session.commit()
-
-def upload_file(dataset_id, username, logic_function='resource_create'):
-    url = toolkit.url_for(
-        controller='api',
-        action='action',
-        logic_function=logic_function, ver='/3')
-    env = {'REMOTE_USER': username.encode('ascii')}
-    postparams = {
-        'name': 'test-flask-upload',
-        'package_id': dataset_id,
-    }
-    upload_content = 'test-content'
-    upload_info = ('upload', 'test-upload.txt', upload_content)
-    app = self._get_test_app()
-    resp = app.post(
-        url, params=postparams,
-        upload_files=[upload_info],
-        extra_environ=env
-        # content_type= 'application/json'
-    )
-    result = resp.json['result']
-    eq_('upload', result['url_type'])
-    eq_(len(upload_content), result['size'])

@@ -1,1 +1,2 @@
 responses==0.10.6
+flake8
