@@ -7,16 +7,6 @@ from ckan.tests import helpers
 from ckan import plugins as p
 
 
-def synchronous_enqueue_job(job_func, args=None, kwargs=None, title=None,
-                            queue=None):
-    '''
-    Synchronous mock for ``ckan.plugins.toolkit.enqueue_job``.
-    '''
-    args = args or []
-    kwargs = kwargs or {}
-    job_func(*args, **kwargs)
-
-
 class TestNotify(object):
     @classmethod
     def setupClass(cls):
@@ -47,8 +37,10 @@ class TestNotify(object):
             [job['title'] for job in helpers.call_action(u'job_list')],
             [u'DownloadAll changed "{}"'.format(dataset['name'])])
 
-    @mock.patch('ckan.plugins.toolkit.enqueue_job',
-                side_effect=synchronous_enqueue_job)
-    def test_new_dataset_has_zip_added(self, enqueue_job_mock):
-        factories.Dataset()
-        # NB exceptions get swallowed by notify
+    # An end-to-end test is too tricky to write - creating a dataset and seeing
+    # the zip file created requires the queue worker to run, but that rips down
+    # the existing database session. And if we use the synchronous_enqueue_job
+    # mock, then when it creates the resoure for the zip it closes the db
+    # session, which is not allowed during a
+    # DomainObjectModificationExtension.notify(). So we just do unit tests for
+    # adding the zip task to the queue, and testing the task (test_tasks.py)
