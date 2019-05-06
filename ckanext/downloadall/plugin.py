@@ -37,6 +37,10 @@ class DownloadallPlugin(plugins.SingletonPlugin):
         if isinstance(entity, model.Package):
             dataset_name = entity.name
         elif isinstance(entity, model.Resource):
+            if entity.extras.get('downloadall_metadata_modified'):
+                # this is the zip of all the resources - no need to react to
+                # it being changed
+                return
             dataset_name = entity.related_packages()[0].name
         else:
             return

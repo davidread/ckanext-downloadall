@@ -1,5 +1,4 @@
 """Tests for plugin.py."""
-import mock
 from nose.tools import assert_equal
 
 from ckan.tests import factories
@@ -36,6 +35,32 @@ class TestNotify(object):
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
             [u'DownloadAll changed "{}"'.format(dataset['name'])])
+
+    def test_creation_of_zip_resource_doesnt_lead_to_queued_task(self):
+        # otherwise we'd get an infinite loop
+        dataset = factories.Dataset()
+        helpers.call_action(u'job_clear')
+        resource = {
+            'package_id': dataset['id'],
+            'name': 'All resource data',
+            # no need to have an upload param in this test
+            'downloadall_metadata_modified': dataset['metadata_modified'],
+        }
+        helpers.call_action(u'resource_create', **resource)
+
+        assert_equal(
+            [job['title'] for job in helpers.call_action(u'job_list')],
+            [u'DownloadAll changed "{}"'.format(dataset['name'])])
+
+    def test_other_instance_types_do_nothing(self):
+        factories.User()
+        factories.Organization()
+        factories.Group()
+        assert_equal(
+            [job['title'] for job in helpers.call_action(u'job_list')],
+            [])
+
+        assert_equal(list(helpers.call_action(u'job_list')), [])
 
     # An end-to-end test is too tricky to write - creating a dataset and seeing
     # the zip file created requires the queue worker to run, but that rips down
