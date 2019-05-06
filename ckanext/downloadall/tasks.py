@@ -35,7 +35,15 @@ def update_zip(package_id):
                 raise
 
             # download all the data and write it to the zip
+            downloadall_resource = None
             for res in dataset['resources']:
+                if res.get('downloadall_metadata_modified'):
+                    # this is an existing zip of all the other resources
+                    downloadall_resource = res
+                    return
+
+                # TODO deal with a resource of resource_type=file.upload
+
                 r = requests.get(res['url'], stream=True)
                 filename = os.path.basename(urlparse.urlparse(res['url']).path)
                 # TODO deal with duplicate filenames in the zip
@@ -99,12 +107,17 @@ def update_zip(package_id):
             'package_id': dataset['id'],
             # 'url': 'http://data',
             'name': 'All resource data',
-            'upload': payload
+            'upload': payload,
+            'downloadall_metadata_modified': dataset['metadata_modified'],
         }
 
         context = {'model': model, 'ignore_auth': True,
                    'user': 'ckanext-downloadall', 'session': model.Session}
-        get_action('resource_create')(context, resource)
+        if not downloadall_resource:
+            get_action('resource_create')(context, resource)
+        else:
+            # TODO update the existing zip resource (using patch?)
+            downloadall_resource
 
         # package_zip = PackageZip.get_for_package(package_id)
         # if not package_zip:

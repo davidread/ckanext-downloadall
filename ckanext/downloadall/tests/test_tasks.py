@@ -26,16 +26,16 @@ def mock_open_if_open_fails(*args, **kwargs):
         return fake_open(*args, **kwargs)
 
 
+@mock.patch.object(ckan.lib.uploader, 'os', fake_os)
+@mock.patch.object(builtins, 'open', side_effect=mock_open_if_open_fails)
+@mock.patch.object(ckan.lib.uploader, '_storage_path', new='/doesnt_exist')
 class TestUpdateZip(object):
     @classmethod
     def setupClass(cls):
         helpers.reset_db()
 
-    @responses.activate
     @helpers.change_config('ckan.storage_path', '/doesnt_exist')
-    @mock.patch.object(ckan.lib.uploader, 'os', fake_os)
-    @mock.patch.object(builtins, 'open', side_effect=mock_open_if_open_fails)
-    @mock.patch.object(ckan.lib.uploader, '_storage_path', new='/doesnt_exist')
+    @responses.activate
     def test_simple(self, _):
         responses.add(
             responses.GET,
@@ -47,6 +47,7 @@ class TestUpdateZip(object):
             'url': 'https://example.com/data.csv',
             'format': 'csv',
             }])
+
         update_zip(dataset['id'])
 
         dataset = helpers.call_action(u'package_show', id=dataset['id'])
@@ -62,3 +63,26 @@ class TestUpdateZip(object):
             with zipfile.ZipFile(f) as zip_:
                 assert_equal(zip_.namelist(), ['data.csv'])
                 assert_equal(zip_.read('data.csv'), 'a,b,c')
+
+    @helpers.change_config('ckan.storage_path', '/doesnt_exist')
+    @responses.activate
+    def test_update_twice(self, _):
+        responses.add(
+            responses.GET,
+            'https://example.com/data.csv',
+            body='a,b,c'
+        )
+        responses.add_passthru('http://127.0.0.1:8983/solr')
+        dataset = factories.Dataset(resources=[{
+            'url': 'https://example.com/data.csv',
+            'format': 'csv',
+            }])
+
+        update_zip(dataset['id'])
+        update_zip(dataset['id'])
+
+        # ensure the zip isn't included in the zip the second time
+        dataset = helpers.call_action(u'package_show', id=dataset['id'])
+        zip_resources = [res for res in dataset['resources']
+                         if res['name'] == u'All resource data']
+        assert_equal(len(zip_resources), 1)
