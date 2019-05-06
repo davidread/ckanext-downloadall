@@ -7,7 +7,8 @@ from ckan.tests import helpers
 from ckan import plugins as p
 
 
-def synchronous_enqueue_job(job_func, args=None, kwargs=None, title=None):
+def synchronous_enqueue_job(job_func, args=None, kwargs=None, title=None,
+                            queue=None):
     '''
     Synchronous mock for ``ckan.plugins.toolkit.enqueue_job``.
     '''
@@ -19,7 +20,7 @@ def synchronous_enqueue_job(job_func, args=None, kwargs=None, title=None):
 class TestNotify(object):
     @classmethod
     def setupClass(cls):
-        p.load('downloadall')
+        p.load(u'downloadall')
         helpers.reset_db()
 
     def setup(self):
@@ -27,14 +28,13 @@ class TestNotify(object):
 
     @classmethod
     def teardown_class(cls):
-        p.unload('downloadall')
+        p.unload(u'downloadall')
 
     def test_new_dataset_leads_to_queued_task(self):
         dataset = factories.Dataset()
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
-            [u'DownloadAll new "{}"'.format(dataset['name']),
-             u'DownloadAll changed "{}"'.format(dataset['name'])])
+            [u'DownloadAll new "{}"'.format(dataset['name'])])
 
     def test_changed_dataset_leads_to_queued_task(self):
         dataset = factories.Dataset()
