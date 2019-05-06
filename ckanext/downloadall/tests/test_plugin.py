@@ -4,6 +4,7 @@ from nose.tools import assert_equal
 
 from ckan.tests import factories
 from ckan.tests import helpers
+from ckan import plugins as p
 
 
 def synchronous_enqueue_job(job_func, args=None, kwargs=None, title=None):
@@ -18,10 +19,15 @@ def synchronous_enqueue_job(job_func, args=None, kwargs=None, title=None):
 class TestNotify(object):
     @classmethod
     def setupClass(cls):
+        p.load('downloadall')
         helpers.reset_db()
 
     def setup(self):
         helpers.call_action(u'job_clear')
+
+    @classmethod
+    def teardown_class(cls):
+        p.unload('downloadall')
 
     def test_new_dataset_leads_to_queued_task(self):
         dataset = factories.Dataset()
