@@ -109,6 +109,10 @@ and do::
     python setup.py develop
     pip install -r dev-requirements.txt
 
+Remember to run the worker (in a separate terminal)::
+
+    paster --plugin=ckan jobs worker --config=/etc/ckan/default/development.ini
+
 
 -----------------
 Running the Tests

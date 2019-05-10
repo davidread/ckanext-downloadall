@@ -8,7 +8,7 @@ from ckan import model
 from tasks import update_zip
 
 
-log = __import__('logging').getLogger()
+log = __import__('logging').getLogger(__name__)
 
 
 class DownloadallPlugin(plugins.SingletonPlugin):
@@ -34,6 +34,8 @@ class DownloadallPlugin(plugins.SingletonPlugin):
         if operation == 'deleted':
             return
 
+        log.debug(u'{} {} {}'
+                  .format(operation, type(entity).__name__, entity.name))
         if isinstance(entity, model.Package):
             dataset_name = entity.name
         elif isinstance(entity, model.Resource):
@@ -44,7 +46,6 @@ class DownloadallPlugin(plugins.SingletonPlugin):
             dataset_name = entity.related_packages()[0].name
         else:
             return
-        print('{} {} {}'.format(operation, type(entity), entity.name))
 
         # skip task if the dataset is already queued
         queue = DEFAULT_QUEUE_NAME
@@ -61,7 +62,10 @@ class DownloadallPlugin(plugins.SingletonPlugin):
                         return
 
         # add this dataset to the queue
+        log.debug(u'Queuing job update_zip: {} {}'
+                  .format(operation, dataset_name))
+
         toolkit.enqueue_job(
             update_zip, [entity.id],
-            title=u'DownloadAll {} "{}"'.format(operation, entity.name),
+            title=u'DownloadAll {} "{}"'.format(operation, dataset_name),
             queue=queue)

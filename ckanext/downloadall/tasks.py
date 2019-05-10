@@ -83,14 +83,18 @@ def write_zip(fp, package_id):
 
         # download all the data and write it to the zip
         existing_zip_resource = None
-        for res in dataset['resources']:
+        for i, res in enumerate(dataset['resources']):
             if res.get('downloadall_metadata_modified'):
                 # this is an existing zip of all the other resources
+                log.debug('Resource resource {}/{} skipped - is the zip itself'
+                          .format(i + 1, len(dataset['resources'])))
                 existing_zip_resource = res
                 continue
 
             # TODO deal with a resource of resource_type=file.upload
 
+            log.debug('Downloading resource {}/{}: {}'
+                      .format(i + 1, len(dataset['resources']), res['url']))
             r = requests.get(res['url'], stream=True)
             filename = os.path.basename(urlparse.urlparse(res['url']).path)
             # TODO deal with duplicate filenames in the zip
