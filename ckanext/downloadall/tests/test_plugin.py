@@ -23,7 +23,8 @@ class TestNotify(object):
         dataset = factories.Dataset()
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
-            [u'DownloadAll new "{}"'.format(dataset['name'])])
+            [u'DownloadAll new "{}" {}'
+             .format(dataset['name'], dataset['id'])])
 
     def test_changed_dataset_leads_to_queued_task(self):
         dataset = factories.Dataset()
@@ -34,7 +35,8 @@ class TestNotify(object):
 
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
-            [u'DownloadAll changed "{}"'.format(dataset['name'])])
+            [u'DownloadAll changed "{}" {}'
+             .format(dataset['name'], dataset['id'])])
 
     def test_creation_of_zip_resource_doesnt_lead_to_queued_task(self):
         # otherwise we'd get an infinite loop
@@ -50,7 +52,8 @@ class TestNotify(object):
 
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
-            [u'DownloadAll changed "{}"'.format(dataset['name'])])
+            [u'DownloadAll changed "{}" {}'
+             .format(dataset['name'], dataset['id'])])
 
     def test_other_instance_types_do_nothing(self):
         factories.User()

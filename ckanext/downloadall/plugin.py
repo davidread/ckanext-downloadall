@@ -34,16 +34,18 @@ class DownloadallPlugin(plugins.SingletonPlugin):
         if operation == 'deleted':
             return
 
-        log.debug(u'{} {} {}'
+        log.debug(u'{} {} \'{}\''
                   .format(operation, type(entity).__name__, entity.name))
         if isinstance(entity, model.Package):
             dataset_name = entity.name
+            dataset_id = entity.id
         elif isinstance(entity, model.Resource):
             if entity.extras.get('downloadall_metadata_modified'):
                 # this is the zip of all the resources - no need to react to
                 # it being changed
                 return
             dataset_name = entity.related_packages()[0].name
+            dataset_id = entity.related_packages()[0].id
         else:
             return
 
@@ -53,12 +55,13 @@ class DownloadallPlugin(plugins.SingletonPlugin):
             {'ignore_auth': True}, {'queues': [queue]})
         if jobs:
             for job in jobs:
-                match = re.match(r'DownloadAll \w+ "([^"]*)"', job[u'title'])
+                match = re.match(
+                    r'DownloadAll \w+ "[^"]*" ([\w-]+)', job[u'title'])
                 if match:
-                    queued_dataset_name = match.groups()[0]
-                    if dataset_name == queued_dataset_name:
-                        log.info('Already queued dataset "{}"'
-                                 .format(dataset_name))
+                    queued_dataset_id = match.groups()[0]
+                    if dataset_id == queued_dataset_id:
+                        log.info('Already queued dataset: {} {}'
+                                 .format(dataset_name, dataset_id))
                         return
 
         # add this dataset to the queue
@@ -66,6 +69,7 @@ class DownloadallPlugin(plugins.SingletonPlugin):
                   .format(operation, dataset_name))
 
         toolkit.enqueue_job(
-            update_zip, [entity.id],
-            title=u'DownloadAll {} "{}"'.format(operation, dataset_name),
+            update_zip, [dataset_id],
+            title=u'DownloadAll {} "{}" {}'.format(operation, dataset_name,
+                                                   dataset_id),
             queue=queue)
