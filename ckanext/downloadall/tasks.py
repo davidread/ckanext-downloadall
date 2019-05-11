@@ -30,12 +30,10 @@ def update_zip(package_id):
 
         # Upload resource to CKAN as a new/updated resource
         # upload: FieldStorage (optional) needs multipart/form-data
-        class FakeFileStorage(cgi.FieldStorage):
-            def __init__(self, fp, filename):
-                self.file = fp
-                self.filename = filename
-                self.name = 'upload'
-        payload = FakeFileStorage(fp, fp.name)
+        fp.seek(0)
+        payload = cgi.FieldStorage()
+        payload.file = fp
+        payload.filename = fp.name
         resource = {
             'package_id': dataset['id'],
             # 'url': 'http://data',
@@ -48,10 +46,13 @@ def update_zip(package_id):
         context = {'model': model, 'ignore_auth': True,
                    'user': 'ckanext-downloadall', 'session': model.Session}
         if not existing_zip_resource:
+            log.debug('Writing new zip resource - {}'.format(dataset['name']))
             get_action('resource_create')(context, resource)
         else:
             # TODO update the existing zip resource (using patch?)
-            existing_zip_resource
+            resource['id'] = existing_zip_resource['id']
+            log.debug('Updating zip resource - {}'.format(dataset['name']))
+            get_action('resource_patch')(context, resource)
 
         # package_zip = PackageZip.get_for_package(package_id)
         # if not package_zip:

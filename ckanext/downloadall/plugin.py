@@ -37,12 +37,16 @@ class DownloadallPlugin(plugins.SingletonPlugin):
         log.debug(u'{} {} \'{}\''
                   .format(operation, type(entity).__name__, entity.name))
         if isinstance(entity, model.Package):
-            dataset_name = entity.name
-            dataset_id = entity.id
+            # don't need to know about changes to the package, just its
+            # resources. Indeed change to the zip resource also trigger a
+            # notify() on the package, and reacting would cause an infinite
+            # loop
+            return
         elif isinstance(entity, model.Resource):
             if entity.extras.get('downloadall_metadata_modified'):
                 # this is the zip of all the resources - no need to react to
                 # it being changed
+                log.debug('Ignoring change to zip resource')
                 return
             dataset_name = entity.related_packages()[0].name
             dataset_id = entity.related_packages()[0].id
