@@ -19,18 +19,20 @@ class TestNotify(object):
     def teardown_class(cls):
         p.unload(u'downloadall')
 
-    def test_new_dataset_leads_to_queued_task(self):
-        dataset = factories.Dataset()
+    def test_new_resource_leads_to_queued_task(self):
+        dataset = factories.Dataset(resources=[
+            {'url': 'http://some.image.png', 'format': 'png'}])
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
             [u'DownloadAll new "{}" {}'
              .format(dataset['name'], dataset['id'])])
 
-    def test_changed_dataset_leads_to_queued_task(self):
-        dataset = factories.Dataset()
+    def test_changed_resource_leads_to_queued_task(self):
+        dataset = factories.Dataset(resources=[
+            {'url': 'http://some.image.png', 'format': 'png'}])
         helpers.call_action(u'job_clear')
 
-        dataset['title'] = 'New title'
+        dataset['resources'][0]['url'] = 'http://another.image.png'
         helpers.call_action(u'package_update', **dataset)
 
         assert_equal(
@@ -40,7 +42,8 @@ class TestNotify(object):
 
     def test_creation_of_zip_resource_doesnt_lead_to_queued_task(self):
         # otherwise we'd get an infinite loop
-        dataset = factories.Dataset()
+        dataset = factories.Dataset(resources=[
+            {'url': 'http://some.image.png', 'format': 'png'}])
         helpers.call_action(u'job_clear')
         resource = {
             'package_id': dataset['id'],
@@ -52,10 +55,10 @@ class TestNotify(object):
 
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
-            [u'DownloadAll changed "{}" {}'
-             .format(dataset['name'], dataset['id'])])
+            [])
 
     def test_other_instance_types_do_nothing(self):
+        factories.Dataset()  # without resources
         factories.User()
         factories.Organization()
         factories.Group()

@@ -1,11 +1,11 @@
 import tempfile
 import zipfile
 import os
-import cgi
 import urlparse
 import hashlib
 
 import requests
+from ckanapi import LocalCKAN
 
 from ckan import model
 from ckan.plugins.toolkit import get_action
@@ -29,31 +29,25 @@ def update_zip(package_id):
         existing_zip_resource, filesize = write_zip(fp, package_id)
 
         # Upload resource to CKAN as a new/updated resource
-        # upload: FieldStorage (optional) needs multipart/form-data
+        registry = LocalCKAN()
         fp.seek(0)
-        payload = cgi.FieldStorage()
-        payload.file = fp
-        payload.filename = fp.name
-        resource = {
-            'package_id': dataset['id'],
-            # 'url': 'http://data',
-            'name': 'All resource data',
-            'upload': payload,
-            'size': filesize,
-            'downloadall_metadata_modified': dataset['metadata_modified'],
-        }
+        resource = dict(
+            package_id=dataset['id'],
+            url='dummy-value',
+            upload=fp,
+            name=u'All resource data',
+            downloadall_metadata_modified=dataset['metadata_modified']
+        )
 
-        context = {'model': model, 'ignore_auth': True,
-                   'user': 'ckanext-downloadall', 'session': model.Session}
         if not existing_zip_resource:
             log.debug('Writing new zip resource - {}'.format(dataset['name']))
-            get_action('resource_create')(context, resource)
+            registry.action.resource_create(**resource)
         else:
             # TODO update the existing zip resource (using patch?)
-            resource['id'] = existing_zip_resource['id']
             log.debug('Updating zip resource - {}'.format(dataset['name']))
-            get_action('resource_patch')(context, resource)
-
+            registry.action.resource_patch(
+                id=existing_zip_resource['id'],
+                **resource)
         # package_zip = PackageZip.get_for_package(package_id)
         # if not package_zip:
         #     PackageZip.create(package_id, filepath, filesize,
