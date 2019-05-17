@@ -5,7 +5,8 @@ import urlparse
 import hashlib
 
 import requests
-from ckanapi import LocalCKAN
+import ckanapi
+import ckanapi.datapackage
 
 from ckan import model
 from ckan.plugins.toolkit import get_action
@@ -29,7 +30,7 @@ def update_zip(package_id):
         existing_zip_resource, filesize = write_zip(fp, package_id)
 
         # Upload resource to CKAN as a new/updated resource
-        registry = LocalCKAN()
+        registry = ckanapi.LocalCKAN()
         fp.seek(0)
         resource = dict(
             package_id=dataset['id'],
@@ -56,14 +57,19 @@ def write_zip(fp, package_id):
 
     :param fp: Open file that the zip can be written to
     '''
+    resource_formats_to_ignore = ['API', 'api']  # TODO make it configurable
+
     with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED, allowZip64=True) \
             as zipf:
         context = {'model': model, 'session': model.Session}
         dataset = get_action('package_show')(
             context, {'id': package_id})
 
-        # download all the data and write it to the zip
+        # filter out resources that are not suitable for inclusion in the data
+        # package
         existing_zip_resource = None
+        ckan = ckanapi.LocalCKAN()
+        resources_to_include = []
         for i, res in enumerate(dataset['resources']):
             if res.get('downloadall_metadata_modified'):
                 # this is an existing zip of all the other resources
@@ -72,13 +78,48 @@ def write_zip(fp, package_id):
                 existing_zip_resource = res
                 continue
 
+            if res['format'] in resource_formats_to_ignore:
+                log.debug('Resource resource {}/{} skipped - because it is '
+                          'format {}'.format(i + 1, len(dataset['resources']),
+                          res['format']))
+                continue
+            resources_to_include.append(res)
+        dataset = dict(dataset, resources=resources_to_include)
+
+        # get the datapackage (metadata)
+        datapackage = ckanapi.datapackage.dataset_to_datapackage(dataset)
+
+        existing_filenames = []
+        i = 0
+        for res, dres in zip(resources_to_include,
+                             datapackage.get('resources', [])):
+            i += 1
+
+            ckanapi.datapackage.populate_datastore_fields(ckan=ckan, res=res)
+
             # TODO deal with a resource of resource_type=file.upload
+
+
 
             log.debug('Downloading resource {}/{}: {}'
                       .format(i + 1, len(dataset['resources']), res['url']))
-            r = requests.get(res['url'], stream=True)
-            filename = os.path.basename(urlparse.urlparse(res['url']).path)
-            # TODO deal with duplicate filenames in the zip
+            try:
+                r = requests.get(res['url'], stream=True)
+            except requests.ConnectionError:
+                log.error('URL {url} refused connection. The resource will not'
+                          ' be downloaded'.format(url=res['url']))
+            except requests.exceptions.RequestException as e:
+                log.error('URL {url} download request exception: {error}'
+                          .format(url=res['url'],
+                          error=str(e.args[0]) if len(e.args) > 0 else str(e)))
+            except Exception as e:
+                log.error('URL {url} download exception: {error}'
+                          .format(url=res['url'],
+                          error=str(e.args[0]) if len(e.args) > 0 else str(e)))
+
+            filename = \
+                ckanapi.datapackage.resource_filename(dres, existing_filenames)
+
             hash_object = hashlib.md5()
             try:
                 # python3 syntax - stream straight into the zip
@@ -100,7 +141,11 @@ def write_zip(fp, package_id):
             file_hash
         # TODO deal with a dataset with no resources
 
-        # TODO add the datapackage.json
+        # Add the datapackage.json
+        with tempfile.NamedTemporaryFile() as json_file:
+            json_file.write(ckanapi.cli.utils.pretty_json(datapackage))
+            json_file.flush()
+            zipf.write(json_file.name, arcname='datapackage.json')
 
         # write HTML index
         # env = jinja2.Environment(loader=jinja2.PackageLoader(
