@@ -48,20 +48,6 @@ def update_zip(package_id):
             registry.action.resource_patch(
                 id=existing_zip_resource['id'],
                 **resource)
-        # package_zip = PackageZip.get_for_package(package_id)
-        # if not package_zip:
-        #     PackageZip.create(package_id, filepath, filesize,
-        #                       has_data=any_have_data)
-        #     log.info('Package zip created: %s', filepath)
-        # else:
-        #     package_zip.filepath = filepath
-        #     package_zip.updated = datetime.datetime.now()
-        #     package_zip.size = filesize
-        #     package_zip.has_data = any_have_data
-        #     log.info('Package zip updated: %s', filepath)
-
-        #     model.Session.add(package_zip)
-        #     model.Session.commit()
 
 
 def write_zip(fp, package_id):
