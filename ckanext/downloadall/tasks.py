@@ -89,17 +89,15 @@ def write_zip(fp, package_id):
         # get the datapackage (metadata)
         datapackage = ckanapi.datapackage.dataset_to_datapackage(dataset)
 
-        existing_filenames = []
         i = 0
         for res, dres in zip(resources_to_include,
                              datapackage.get('resources', [])):
             i += 1
 
-            ckanapi.datapackage.populate_datastore_fields(ckan=ckan, res=res)
+            ckanapi.datapackage.populate_datastore_res_fields(
+                ckan=ckan, res=res)
 
             # TODO deal with a resource of resource_type=file.upload
-
-
 
             log.debug('Downloading resource {}/{}: {}'
                       .format(i + 1, len(dataset['resources']), res['url']))
@@ -110,15 +108,13 @@ def write_zip(fp, package_id):
                           ' be downloaded'.format(url=res['url']))
             except requests.exceptions.RequestException as e:
                 log.error('URL {url} download request exception: {error}'
-                          .format(url=res['url'],
-                          error=str(e.args[0]) if len(e.args) > 0 else str(e)))
+                          .format(url=res['url'], error=str(e)))
             except Exception as e:
                 log.error('URL {url} download exception: {error}'
-                          .format(url=res['url'],
-                          error=str(e.args[0]) if len(e.args) > 0 else str(e)))
+                          .format(url=res['url'], error=str(e)))
 
             filename = \
-                ckanapi.datapackage.resource_filename(dres, existing_filenames)
+                ckanapi.datapackage.resource_filename(dres)
 
             hash_object = hashlib.md5()
             try:

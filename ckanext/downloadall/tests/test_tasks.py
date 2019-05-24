@@ -1,5 +1,6 @@
 import __builtin__ as builtins
 import zipfile
+import json
 
 import mock
 from nose.tools import assert_equal
@@ -18,6 +19,7 @@ fs = fake_filesystem.FakeFilesystem()
 fake_os = fake_filesystem.FakeOsModule(fs)
 fake_open = fake_filesystem.FakeFileOpen(fs)
 
+eq = assert_equal
 
 def mock_open_if_open_fails(*args, **kwargs):
     try:
@@ -59,10 +61,24 @@ class TestUpdateZip(object):
 
         uploader = ckan.lib.uploader.get_resource_uploader(zip_resource)
         filepath = uploader.get_path(zip_resource[u'id'])
+        csv_filename_in_zip = '{}.csv'.format(dataset['resources'][0]['id'])
         with fake_open(filepath, 'rb') as f:
             with zipfile.ZipFile(f) as zip_:
-                assert_equal(zip_.namelist(), ['data.csv'])
-                assert_equal(zip_.read('data.csv'), 'a,b,c')
+                assert_equal(zip_.namelist(),
+                             [csv_filename_in_zip, 'datapackage.json'])
+                assert_equal(zip_.read(csv_filename_in_zip), 'a,b,c')
+                datapackage_json = zip_.read('datapackage.json')
+                assert datapackage_json.startswith('{\n  "description"')
+                datapackage = json.loads(datapackage_json)
+                eq(datapackage[u'name'][:12], u'test_dataset')
+                eq(datapackage[u'title'], u'Test Dataset')
+                eq(datapackage[u'description'], u'Just another test dataset.')
+                eq(datapackage[u'resources'], [{
+                    u'format': u'CSV',
+                    u'name': dataset['resources'][0]['id'],
+                    u'path': u'https://example.com/data.csv'}])
+
+
 
     @helpers.change_config('ckan.storage_path', '/doesnt_exist')
     @responses.activate
