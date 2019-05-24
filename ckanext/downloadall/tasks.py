@@ -1,7 +1,6 @@
 import tempfile
 import zipfile
 import os
-import urlparse
 import hashlib
 
 import requests
@@ -57,8 +56,6 @@ def write_zip(fp, package_id):
 
     :param fp: Open file that the zip can be written to
     '''
-    resource_formats_to_ignore = ['API', 'api']  # TODO make it configurable
-
     with zipfile.ZipFile(fp, 'w', zipfile.ZIP_DEFLATED, allowZip64=True) \
             as zipf:
         context = {'model': model, 'session': model.Session}
@@ -67,24 +64,10 @@ def write_zip(fp, package_id):
 
         # filter out resources that are not suitable for inclusion in the data
         # package
-        existing_zip_resource = None
         ckan = ckanapi.LocalCKAN()
-        resources_to_include = []
-        for i, res in enumerate(dataset['resources']):
-            if res.get('downloadall_metadata_modified'):
-                # this is an existing zip of all the other resources
-                log.debug('Resource resource {}/{} skipped - is the zip itself'
-                          .format(i + 1, len(dataset['resources'])))
-                existing_zip_resource = res
-                continue
-
-            if res['format'] in resource_formats_to_ignore:
-                log.debug('Resource resource {}/{} skipped - because it is '
-                          'format {}'.format(i + 1, len(dataset['resources']),
-                          res['format']))
-                continue
-            resources_to_include.append(res)
-        dataset = dict(dataset, resources=resources_to_include)
+        dataset, resources_to_include, existing_zip_resource = \
+            remove_resources_that_should_not_be_included_in_the_datapackage(
+                dataset)
 
         # get the datapackage (metadata)
         datapackage = ckanapi.datapackage.dataset_to_datapackage(dataset)
@@ -143,31 +126,32 @@ def write_zip(fp, package_id):
             json_file.flush()
             zipf.write(json_file.name, arcname='datapackage.json')
 
-        # write HTML index
-        # env = jinja2.Environment(loader=jinja2.PackageLoader(
-        #     'ckanext.downloadll', 'templates'))
-        # env.filters['datetimeformat'] = datetimeformat
-        # template = env.get_template('index.html')
-        # zipf.writestr('index.html',
-        #     template.render(datapackage=datapackage,
-        #                     date=datetime.datetime.now()).encode('utf8'))
-
-        # Strip out unnecessary data from datapackage
-        # for res in datapackage['resources']:
-        #     del res['has_data']
-        #     if 'cache_filepath' in res:
-        #         del res['cache_filepath']
-        #     if 'reason' in res:
-        #         del res['reason']
-        #     if 'detected_format' in res:
-        #         del res['detected_format']
-
-        # zipf.writestr('datapackage.json',
-        #               json.dumps(datapackage, indent=4))
-
     statinfo = os.stat(fp.name)
     filesize = statinfo.st_size
 
     log.info('Zip created: {} {} bytes'.format(fp.name, filesize))
 
     return existing_zip_resource, filesize
+
+
+def remove_resources_that_should_not_be_included_in_the_datapackage(dataset):
+    resource_formats_to_ignore = ['API', 'api']  # TODO make it configurable
+
+    existing_zip_resource = None
+    resources_to_include = []
+    for i, res in enumerate(dataset['resources']):
+        if res.get('downloadall_metadata_modified'):
+            # this is an existing zip of all the other resources
+            log.debug('Resource resource {}/{} skipped - is the zip itself'
+                      .format(i + 1, len(dataset['resources'])))
+            existing_zip_resource = res
+            continue
+
+        if res['format'] in resource_formats_to_ignore:
+            log.debug('Resource resource {}/{} skipped - because it is '
+                      'format {}'.format(i + 1, len(dataset['resources']),
+                                         res['format']))
+            continue
+        resources_to_include.append(res)
+    dataset = dict(dataset, resources=resources_to_include)
+    return dataset, resources_to_include, existing_zip_resource

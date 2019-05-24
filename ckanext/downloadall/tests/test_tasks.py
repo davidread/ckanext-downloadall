@@ -21,6 +21,7 @@ fake_open = fake_filesystem.FakeFileOpen(fs)
 
 eq = assert_equal
 
+
 def mock_open_if_open_fails(*args, **kwargs):
     try:
         return real_open(*args, **kwargs)
@@ -77,8 +78,6 @@ class TestUpdateZip(object):
                     u'format': u'CSV',
                     u'name': dataset['resources'][0]['id'],
                     u'path': u'https://example.com/data.csv'}])
-
-
 
     @helpers.change_config('ckan.storage_path', '/doesnt_exist')
     @responses.activate
