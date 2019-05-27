@@ -86,15 +86,24 @@ def write_zip(fp, package_id):
                       .format(i, len(dataset['resources']), res['url']))
             try:
                 r = requests.get(res['url'], stream=True)
+                r.raise_for_status()
             except requests.ConnectionError:
                 log.error('URL {url} refused connection. The resource will not'
                           ' be downloaded'.format(url=res['url']))
+                continue
             except requests.exceptions.RequestException as e:
                 log.error('URL {url} download request exception: {error}'
                           .format(url=res['url'], error=str(e)))
+                continue
+            except requests.ConnectionError as e:
+                log.error('URL {url} status error: {status}. The resource will'
+                          ' not be downloaded'
+                          .format(url=res['url'], status=e.status_code))
+                continue
             except Exception as e:
                 log.error('URL {url} download exception: {error}'
                           .format(url=res['url'], error=str(e)))
+                continue
 
             filename = \
                 ckanapi.datapackage.resource_filename(dres)

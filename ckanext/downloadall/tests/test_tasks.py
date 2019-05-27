@@ -8,6 +8,7 @@ import mock
 from nose.tools import assert_equal
 from pyfakefs import fake_filesystem
 import responses
+import requests
 
 from ckan.tests import factories, helpers
 import ckan.lib.uploader
@@ -158,4 +159,83 @@ class TestUpdateZip(object):
                     u'sources': [{u'path': dataset['resources'][0]['url'],
                                   u'title': u'Rainfall'}],
                     u'title': u'Rainfall',
+                    }])
+
+
+    @helpers.change_config('ckan.storage_path', '/doesnt_exist')
+    @responses.activate
+    def test_resource_url_with_connection_error(self, _):
+        responses.add_passthru('http://127.0.0.1:8983/solr')
+        responses.add(
+            responses.GET,
+            'https://example.com/data.csv',
+            body=requests.ConnectionError('Some network trouble...')
+        )
+        dataset = factories.Dataset(resources=[{
+            'url': 'https://example.com/data.csv',
+            'name': 'rainfall',
+            'format': 'csv',
+            }])
+
+        update_zip(dataset['id'])
+
+        dataset = helpers.call_action(u'package_show', id=dataset['id'])
+        zip_resources = [res for res in dataset['resources']
+                         if res['name'] == u'All resource data']
+        zip_resource = zip_resources[0]
+        uploader = ckan.lib.uploader.get_resource_uploader(zip_resource)
+        filepath = uploader.get_path(zip_resource[u'id'])
+        csv_filename_in_zip = u'rainfall.csv'
+        with fake_open(filepath, 'rb') as f:
+            with zipfile.ZipFile(f) as zip_:
+                # Zip doesn't contain the data, just the json file
+                assert_equal(zip_.namelist(),
+                             ['datapackage.json'])
+                # Check datapackage.json
+                datapackage_json = zip_.read('datapackage.json')
+                datapackage = json.loads(datapackage_json)
+                eq(datapackage[u'resources'], [{
+                    u'format': u'CSV',
+                    u'name': u'rainfall',
+                    u'path': 'https://example.com/data.csv',
+                    u'title': u'rainfall',
+                    }])
+
+    @helpers.change_config('ckan.storage_path', '/doesnt_exist')
+    @responses.activate
+    def test_resource_url_with_404_error(self, _):
+        responses.add_passthru('http://127.0.0.1:8983/solr')
+        responses.add(
+            responses.GET,
+            'https://example.com/data.csv',
+            status=404
+        )
+        dataset = factories.Dataset(resources=[{
+            'url': 'https://example.com/data.csv',
+            'name': 'rainfall',
+            'format': 'csv',
+            }])
+
+        update_zip(dataset['id'])
+
+        dataset = helpers.call_action(u'package_show', id=dataset['id'])
+        zip_resources = [res for res in dataset['resources']
+                         if res['name'] == u'All resource data']
+        zip_resource = zip_resources[0]
+        uploader = ckan.lib.uploader.get_resource_uploader(zip_resource)
+        filepath = uploader.get_path(zip_resource[u'id'])
+        csv_filename_in_zip = u'rainfall.csv'
+        with fake_open(filepath, 'rb') as f:
+            with zipfile.ZipFile(f) as zip_:
+                # Zip doesn't contain the data, just the json file
+                assert_equal(zip_.namelist(),
+                             ['datapackage.json'])
+                # Check datapackage.json
+                datapackage_json = zip_.read('datapackage.json')
+                datapackage = json.loads(datapackage_json)
+                eq(datapackage[u'resources'], [{
+                    u'format': u'CSV',
+                    u'name': u'rainfall',
+                    u'path': 'https://example.com/data.csv',
+                    u'title': u'rainfall',
                     }])
