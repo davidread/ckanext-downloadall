@@ -25,8 +25,8 @@ def update_zip(package_id):
     dataset = get_action('package_show')(context, {'id': package_id})
     log.debug('Updating zip {}'.format(dataset['name']))
 
-    # 'filename' = "{0}.zip".format(dataset['name'])
-    with tempfile.NamedTemporaryFile() as fp:
+    prefix = "{}-".format(dataset[u'name'])
+    with tempfile.NamedTemporaryFile(prefix=prefix, suffix='.zip') as fp:
         existing_zip_resource, filesize = write_zip(fp, package_id)
 
         # Upload resource to CKAN as a new/updated resource
