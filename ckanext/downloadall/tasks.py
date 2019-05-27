@@ -1,11 +1,12 @@
 import tempfile
 import zipfile
 import os
-import urlparse
 import hashlib
+import math
 
 import requests
-from ckanapi import LocalCKAN
+import ckanapi
+import ckanapi.datapackage
 
 from ckan import model
 from ckan.plugins.toolkit import get_action
@@ -29,13 +30,14 @@ def update_zip(package_id):
         existing_zip_resource, filesize = write_zip(fp, package_id)
 
         # Upload resource to CKAN as a new/updated resource
-        registry = LocalCKAN()
+        registry = ckanapi.LocalCKAN()
         fp.seek(0)
         resource = dict(
             package_id=dataset['id'],
             url='dummy-value',
             upload=fp,
             name=u'All resource data',
+            format=u'ZIP',
             downloadall_metadata_modified=dataset['metadata_modified']
         )
 
@@ -62,67 +64,90 @@ def write_zip(fp, package_id):
         dataset = get_action('package_show')(
             context, {'id': package_id})
 
-        # download all the data and write it to the zip
-        existing_zip_resource = None
-        for i, res in enumerate(dataset['resources']):
-            if res.get('downloadall_metadata_modified'):
-                # this is an existing zip of all the other resources
-                log.debug('Resource resource {}/{} skipped - is the zip itself'
-                          .format(i + 1, len(dataset['resources'])))
-                existing_zip_resource = res
-                continue
+        # filter out resources that are not suitable for inclusion in the data
+        # package
+        ckan = ckanapi.LocalCKAN()
+        dataset, resources_to_include, existing_zip_resource = \
+            remove_resources_that_should_not_be_included_in_the_datapackage(
+                dataset)
 
-            # TODO deal with a resource of resource_type=file.upload
+        # get the datapackage (metadata)
+        datapackage = ckanapi.datapackage.dataset_to_datapackage(dataset)
+
+        i = 0
+        for res, dres in zip(resources_to_include,
+                             datapackage.get('resources', [])):
+            i += 1
+
+            ckanapi.datapackage.populate_datastore_res_fields(
+                ckan=ckan, res=res)
 
             log.debug('Downloading resource {}/{}: {}'
-                      .format(i + 1, len(dataset['resources']), res['url']))
-            r = requests.get(res['url'], stream=True)
-            filename = os.path.basename(urlparse.urlparse(res['url']).path)
-            # TODO deal with duplicate filenames in the zip
+                      .format(i, len(dataset['resources']), res['url']))
+            try:
+                r = requests.get(res['url'], stream=True)
+                r.raise_for_status()
+            except requests.ConnectionError:
+                log.error('URL {url} refused connection. The resource will not'
+                          ' be downloaded'.format(url=res['url']))
+                continue
+            except requests.exceptions.RequestException as e:
+                log.error('URL {url} download request exception: {error}'
+                          .format(url=res['url'], error=str(e)))
+                continue
+            except requests.ConnectionError as e:
+                log.error('URL {url} status error: {status}. The resource will'
+                          ' not be downloaded'
+                          .format(url=res['url'], status=e.status_code))
+                continue
+            except Exception as e:
+                log.error('URL {url} download exception: {error}'
+                          .format(url=res['url'], error=str(e)))
+                continue
+
+            filename = \
+                ckanapi.datapackage.resource_filename(dres)
+
             hash_object = hashlib.md5()
+            size = 0
             try:
                 # python3 syntax - stream straight into the zip
                 with zipf.open(filename, 'wb') as zf:
                     for chunk in r.iter_content(chunk_size=128):
                         zf.write(chunk)
                         hash_object.update(chunk)
+                        size += len(chunk)
             except RuntimeError:
                 # python2 syntax - need to save to disk first
                 with tempfile.NamedTemporaryFile() as datafile:
                     for chunk in r.iter_content(chunk_size=128):
                         datafile.write(chunk)
                         hash_object.update(chunk)
+                        size += len(chunk)
                     datafile.flush()
                     # .write() streams the file into the zip
                     zipf.write(datafile.name, arcname=filename)
             file_hash = hash_object.hexdigest()
+            log.debug('Downloaded {}, hash: {}'
+                      .format(format_bytes(size), file_hash))
+
+            # save path in datapackage.json
+            title = dres.get('title') or res.get('title') \
+                or res.get('name', '')
+            dres['sources'] = [{'title': title,
+                                'path': dres['path']}]
+            dres['path'] = filename
+
             # TODO optimize using the file_hash
             file_hash
         # TODO deal with a dataset with no resources
 
-        # TODO add the datapackage.json
-
-        # write HTML index
-        # env = jinja2.Environment(loader=jinja2.PackageLoader(
-        #     'ckanext.downloadll', 'templates'))
-        # env.filters['datetimeformat'] = datetimeformat
-        # template = env.get_template('index.html')
-        # zipf.writestr('index.html',
-        #     template.render(datapackage=datapackage,
-        #                     date=datetime.datetime.now()).encode('utf8'))
-
-        # Strip out unnecessary data from datapackage
-        # for res in datapackage['resources']:
-        #     del res['has_data']
-        #     if 'cache_filepath' in res:
-        #         del res['cache_filepath']
-        #     if 'reason' in res:
-        #         del res['reason']
-        #     if 'detected_format' in res:
-        #         del res['detected_format']
-
-        # zipf.writestr('datapackage.json',
-        #               json.dumps(datapackage, indent=4))
+        # Add the datapackage.json
+        with tempfile.NamedTemporaryFile() as json_file:
+            json_file.write(ckanapi.cli.utils.pretty_json(datapackage))
+            json_file.flush()
+            zipf.write(json_file.name, arcname='datapackage.json')
+            log.debug('Added datapackage.json from {}'.format(json_file.name))
 
     statinfo = os.stat(fp.name)
     filesize = statinfo.st_size
@@ -130,3 +155,36 @@ def write_zip(fp, package_id):
     log.info('Zip created: {} {} bytes'.format(fp.name, filesize))
 
     return existing_zip_resource, filesize
+
+
+def format_bytes(size_bytes):
+   if size_bytes == 0:
+       return "0 bytes"
+   size_name = ("bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+   i = int(math.floor(math.log(size_bytes, 1024)))
+   p = math.pow(1024, i)
+   s = round(size_bytes / p, 1)
+   return '{} {}'.format(s, size_name[i])
+
+
+def remove_resources_that_should_not_be_included_in_the_datapackage(dataset):
+    resource_formats_to_ignore = ['API', 'api']  # TODO make it configurable
+
+    existing_zip_resource = None
+    resources_to_include = []
+    for i, res in enumerate(dataset['resources']):
+        if res.get('downloadall_metadata_modified'):
+            # this is an existing zip of all the other resources
+            log.debug('Resource resource {}/{} skipped - is the zip itself'
+                      .format(i + 1, len(dataset['resources'])))
+            existing_zip_resource = res
+            continue
+
+        if res['format'] in resource_formats_to_ignore:
+            log.debug('Resource resource {}/{} skipped - because it is '
+                      'format {}'.format(i + 1, len(dataset['resources']),
+                                         res['format']))
+            continue
+        resources_to_include.append(res)
+    dataset = dict(dataset, resources=resources_to_include)
+    return dataset, resources_to_include, existing_zip_resource
