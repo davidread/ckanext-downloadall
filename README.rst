@@ -5,40 +5,34 @@
 .. image:: https://travis-ci.org/davidread/ckanext-downloadall.svg?branch=master
     :target: https://travis-ci.org/davidread/ckanext-downloadall
 
-.. image:: https://coveralls.io/repos/davidread/ckanext-downloadall/badge.svg
-  :target: https://coveralls.io/r/davidread/ckanext-downloadall
-
-.. image:: https://pypip.in/download/ckanext-downloadall/badge.svg
-    :target: https://pypi.python.org/pypi//ckanext-downloadall/
-    :alt: Downloads
-
-.. image:: https://pypip.in/version/ckanext-downloadall/badge.svg
-    :target: https://pypi.python.org/pypi/ckanext-downloadall/
+.. image:: https://img.shields.io/pypi/v/ckanext-downloadall.svg
+    :target: https://pypi.python.org/project/ckanext-downloadall/
     :alt: Latest Version
 
-.. image:: https://pypip.in/py_versions/ckanext-downloadall/badge.svg
-    :target: https://pypi.python.org/pypi/ckanext-downloadall/
+.. image:: https://img.shields.io/pypi/pyversions/ckanext-downloadall.svg
+    :target: https://pypi.python.org/project/ckanext-downloadall/
     :alt: Supported Python versions
 
-.. image:: https://pypip.in/status/ckanext-downloadall/badge.svg
-    :target: https://pypi.python.org/pypi/ckanext-downloadall/
+.. image:: https://img.shields.io/pypi/status/ckanext-downloadall.svg
+    :target: https://pypi.python.org/project/ckanext-downloadall/
     :alt: Development Status
 
-.. image:: https://pypip.in/license/ckanext-downloadall/badge.svg
-    :target: https://pypi.python.org/pypi/ckanext-downloadall/
+.. image:: https://img.shields.io/pypi/l/ckanext-downloadall.svg
+    :target: https://pypi.python.org/project/ckanext-downloadall/
     :alt: License
 
-=============
+===================
 ckanext-downloadall
-=============
+===================
 
 This CKAN extension adds a "Download all" button to datasets. This downloads
 a zip file containing all the resource files and a datapackage.json.
 
 .. image:: demo.png
 
-The datapackage.json is a [Frictionless Data] standard, also known as a Data
-Package.
+The `datapackage.json <https://frictionlessdata.io/specs/data-package/>`_ is a
+`Frictionless Data <https://frictionlessdata.io/specs/data-package/>`_
+standard, also known as a Data Package.
 
 If the resource is pushed/xloaded to Datastore then the schema (column types)
 are included in the datapackage.json file.
@@ -48,9 +42,9 @@ dataset is created or updated. This suits CKANs where all files are uploaded -
 if the underlying data file changes without CKAN knowing about it, then the zip
 will not include the update.
 
-(This extension is inspired by
-[ckanext-packagezip](https://github.com/datagovuk/ckanext-packagezip), but that
-is old and relied on ckanext-archiver and IPipe.)
+(This extension is inspired by `ckanext-packagezip
+<https://github.com/datagovuk/ckanext-packagezip>`_, but that is old and relied
+on ckanext-archiver and IPipe.)
 
 ------------
 Requirements
@@ -133,57 +127,38 @@ coverage installed in your virtualenv (``pip install coverage``) then run::
     nosetests --nologcapture --with-pylons=test.ini --with-coverage --cover-package=ckanext.downloadall --cover-inclusive --cover-erase --cover-tests
 
 
----------------------------------
-Registering ckanext-downloadall on PyPI
----------------------------------
-
-ckanext-downloadall should be availabe on PyPI as
-https://pypi.python.org/pypi/ckanext-downloadall. If that link doesn't work, then
-you can register the project on PyPI for the first time by following these
-steps:
-
-1. Create a source distribution of the project::
-
-     python setup.py sdist
-
-2. Register the project::
-
-     python setup.py register
-
-3. Upload the source distribution to PyPI::
-
-     python setup.py sdist upload
-
-4. Tag the first release of the project on GitHub with the version number from
-   the ``setup.py`` file. For example if the version number in ``setup.py`` is
-   0.0.1 then do::
-
-       git tag 0.0.1
-       git push --tags
-
-
-----------------------------------------
+----------------------------------------------
 Releasing a New Version of ckanext-downloadall
-----------------------------------------
+----------------------------------------------
 
-ckanext-downloadall is availabe on PyPI as https://pypi.python.org/pypi/ckanext-downloadall.
+ckanext-downloadall is availabe on PyPI as https://pypi.org/project/ckanext-downloadall/.
 To publish a new version to PyPI follow these steps:
 
 1. Update the version number in the ``setup.py`` file.
    See `PEP 440 <http://legacy.python.org/dev/peps/pep-0440/#public-version-identifiers>`_
    for how to choose version numbers.
 
-2. Create a source distribution of the new version::
+2. Make sure you have the latest version of necessary packages::
 
-     python setup.py sdist
+    pip install --upgrade setuptools wheel twine
 
-3. Upload the source distribution to PyPI::
+3. Create a source and binary distributions of the new version::
 
-     python setup.py sdist upload
+       python setup.py sdist bdist_wheel && twine check dist/*
 
-4. Tag the new release of the project on GitHub with the version number from
+   Fix any errors you get.
+
+4. Upload the source distribution to PyPI::
+
+       twine upload dist/*
+
+5. Commit any outstanding changes::
+
+       git commit -a
+
+6. Tag the new release of the project on GitHub with the version number from
    the ``setup.py`` file. For example if the version number in ``setup.py`` is
-   0.0.2 then do::
+   0.0.1 then do::
 
-       git tag 0.0.2
+       git tag 0.0.1
        git push --tags
