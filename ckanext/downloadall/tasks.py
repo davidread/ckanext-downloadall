@@ -52,6 +52,10 @@ def update_zip(package_id):
                 **resource)
 
 
+class DownloadError(Exception):
+    pass
+
+
 def write_zip(fp, package_id):
     '''
     Downloads resources and writes the zip file.
@@ -84,52 +88,14 @@ def write_zip(fp, package_id):
 
             log.debug('Downloading resource {}/{}: {}'
                       .format(i, len(dataset['resources']), res['url']))
-            try:
-                r = requests.get(res['url'], stream=True)
-                r.raise_for_status()
-            except requests.ConnectionError:
-                log.error('URL {url} refused connection. The resource will not'
-                          ' be downloaded'.format(url=res['url']))
-                continue
-            except requests.exceptions.RequestException as e:
-                log.error('URL {url} download request exception: {error}'
-                          .format(url=res['url'], error=str(e)))
-                continue
-            except requests.ConnectionError as e:
-                log.error('URL {url} status error: {status}. The resource will'
-                          ' not be downloaded'
-                          .format(url=res['url'], status=e.status_code))
-                continue
-            except Exception as e:
-                log.error('URL {url} download exception: {error}'
-                          .format(url=res['url'], error=str(e)))
-                continue
-
             filename = \
                 ckanapi.datapackage.resource_filename(dres)
-
-            hash_object = hashlib.md5()
-            size = 0
             try:
-                # python3 syntax - stream straight into the zip
-                with zipf.open(filename, 'wb') as zf:
-                    for chunk in r.iter_content(chunk_size=128):
-                        zf.write(chunk)
-                        hash_object.update(chunk)
-                        size += len(chunk)
-            except RuntimeError:
-                # python2 syntax - need to save to disk first
-                with tempfile.NamedTemporaryFile() as datafile:
-                    for chunk in r.iter_content(chunk_size=128):
-                        datafile.write(chunk)
-                        hash_object.update(chunk)
-                        size += len(chunk)
-                    datafile.flush()
-                    # .write() streams the file into the zip
-                    zipf.write(datafile.name, arcname=filename)
-            file_hash = hash_object.hexdigest()
-            log.debug('Downloaded {}, hash: {}'
-                      .format(format_bytes(size), file_hash))
+                download_resource_into_zip(res['url'], filename, zipf)
+            except DownloadError:
+                # The dres['path'] is left as the url - i.e. an 'external
+                # resource' of the data package.
+                continue
 
             # save path in datapackage.json
             title = dres.get('title') or res.get('title') \
@@ -139,15 +105,11 @@ def write_zip(fp, package_id):
             dres['path'] = filename
 
             # TODO optimize using the file_hash
-            file_hash
+
         # TODO deal with a dataset with no resources
 
         # Add the datapackage.json
-        with tempfile.NamedTemporaryFile() as json_file:
-            json_file.write(ckanapi.cli.utils.pretty_json(datapackage))
-            json_file.flush()
-            zipf.write(json_file.name, arcname='datapackage.json')
-            log.debug('Added datapackage.json from {}'.format(json_file.name))
+        write_datapackage_json(datapackage, zipf)
 
     statinfo = os.stat(fp.name)
     filesize = statinfo.st_size
@@ -157,14 +119,68 @@ def write_zip(fp, package_id):
     return existing_zip_resource, filesize
 
 
+def download_resource_into_zip(url, filename, zipf):
+    try:
+        r = requests.get(url, stream=True)
+        r.raise_for_status()
+    except requests.ConnectionError:
+        log.error('URL {url} refused connection. The resource will not'
+                  ' be downloaded'.format(url=url))
+        raise DownloadError()
+    except requests.exceptions.HTTPError as e:
+        log.error('URL {url} status error: {status}. The resource will'
+                  ' not be downloaded'
+                  .format(url=url, status=e.response.status_code))
+        raise DownloadError()
+    except requests.exceptions.RequestException as e:
+        log.error('URL {url} download request exception: {error}'
+                  .format(url=url, error=str(e)))
+        raise DownloadError()
+    except Exception as e:
+        log.error('URL {url} download exception: {error}'
+                  .format(url=url, error=str(e)))
+        raise DownloadError()
+
+    hash_object = hashlib.md5()
+    size = 0
+    try:
+        # python3 syntax - stream straight into the zip
+        with zipf.open(filename, 'wb') as zf:
+            for chunk in r.iter_content(chunk_size=128):
+                zf.write(chunk)
+                hash_object.update(chunk)
+                size += len(chunk)
+    except RuntimeError:
+        # python2 syntax - need to save to disk first
+        with tempfile.NamedTemporaryFile() as datafile:
+            for chunk in r.iter_content(chunk_size=128):
+                datafile.write(chunk)
+                hash_object.update(chunk)
+                size += len(chunk)
+            datafile.flush()
+            # .write() streams the file into the zip
+            zipf.write(datafile.name, arcname=filename)
+    file_hash = hash_object.hexdigest()
+    log.debug('Downloaded {}, hash: {}'
+              .format(format_bytes(size), file_hash))
+
+
+def write_datapackage_json(datapackage, zipf):
+    with tempfile.NamedTemporaryFile() as json_file:
+        json_file.write(ckanapi.cli.utils.pretty_json(datapackage))
+        json_file.flush()
+        zipf.write(json_file.name, arcname='datapackage.json')
+        log.debug('Added datapackage.json from {}'.format(json_file.name))
+
+
 def format_bytes(size_bytes):
-   if size_bytes == 0:
-       return "0 bytes"
-   size_name = ("bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
-   i = int(math.floor(math.log(size_bytes, 1024)))
-   p = math.pow(1024, i)
-   s = round(size_bytes / p, 1)
-   return '{} {}'.format(s, size_name[i])
+    if size_bytes == 0:
+        return "0 bytes"
+    size_name = ("bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 1)
+    return '{} {}'.format(s, size_name[i])
 
 
 def remove_resources_that_should_not_be_included_in_the_datapackage(dataset):

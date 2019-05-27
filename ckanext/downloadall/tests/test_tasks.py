@@ -161,7 +161,6 @@ class TestUpdateZip(object):
                     u'title': u'Rainfall',
                     }])
 
-
     @helpers.change_config('ckan.storage_path', '/doesnt_exist')
     @responses.activate
     def test_resource_url_with_connection_error(self, _):
@@ -185,7 +184,6 @@ class TestUpdateZip(object):
         zip_resource = zip_resources[0]
         uploader = ckan.lib.uploader.get_resource_uploader(zip_resource)
         filepath = uploader.get_path(zip_resource[u'id'])
-        csv_filename_in_zip = u'rainfall.csv'
         with fake_open(filepath, 'rb') as f:
             with zipfile.ZipFile(f) as zip_:
                 # Zip doesn't contain the data, just the json file
@@ -197,6 +195,7 @@ class TestUpdateZip(object):
                 eq(datapackage[u'resources'], [{
                     u'format': u'CSV',
                     u'name': u'rainfall',
+                    # path is to the URL - an 'external resource'
                     u'path': 'https://example.com/data.csv',
                     u'title': u'rainfall',
                     }])
@@ -224,7 +223,6 @@ class TestUpdateZip(object):
         zip_resource = zip_resources[0]
         uploader = ckan.lib.uploader.get_resource_uploader(zip_resource)
         filepath = uploader.get_path(zip_resource[u'id'])
-        csv_filename_in_zip = u'rainfall.csv'
         with fake_open(filepath, 'rb') as f:
             with zipfile.ZipFile(f) as zip_:
                 # Zip doesn't contain the data, just the json file
@@ -236,6 +234,7 @@ class TestUpdateZip(object):
                 eq(datapackage[u'resources'], [{
                     u'format': u'CSV',
                     u'name': u'rainfall',
+                    # path is to the URL - an 'external resource'
                     u'path': 'https://example.com/data.csv',
                     u'title': u'rainfall',
                     }])
