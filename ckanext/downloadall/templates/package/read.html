@@ -1,21 +1,21 @@
 {% ckan_extends %}
 
 {% block package_resources %}
-  <!-- <div style="float:right; margin-right: -7px;">
-    <a href="{% url_for 'export_datapackage', package_id=pkg.name %}"
-       class='btn' id='export_datapackage_button'> -->
 
-  {% set zip_res = h.downloadall__pop_zip_resource(pkg) %}
+  {% if pkg.resources %}
+    <div class="btn-group" style="float:right">
 
-  <div class="btn-group" style="float:right">
-    {% if zip_res %}
-      <a class="btn btn-primary resource-url-analytics resource-type-{{ zip_res.resource_type }}" href="{{ zip_res.url }}">
-        <i class="fa fa-arrow-circle-o-down"></i> {{ _('Download all') }}
-      </a>
-    {% else %}
-      <span>'Download all' not currently available</span>
-    {% endif %}
-  </div>
+      {% set zip_res = h.downloadall__pop_zip_resource(pkg) %}
+      {% if zip_res %}
+        <a class="btn btn-primary resource-url-analytics resource-type-{{ zip_res.resource_type }}" href="{{ zip_res.url }}">
+      {% else %}
+        <a class="btn btn-primary" disabled="disabled" title="This download is not currently available" href="#">
+      {% endif %}
+          <i class="fa fa-arrow-circle-o-down"></i> {{ _('Download all') }}
+        </a>
+
+    </div>
+  {% endif %}
 
   {{ super() }}
 
