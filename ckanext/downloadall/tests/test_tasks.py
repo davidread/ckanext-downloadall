@@ -1,6 +1,8 @@
 import __builtin__ as builtins
 import zipfile
 import json
+import tempfile
+import re
 
 import mock
 from nose.tools import assert_equal
@@ -10,6 +12,7 @@ import responses
 from ckan.tests import factories, helpers
 import ckan.lib.uploader
 from ckanext.downloadall.tasks import update_zip
+import ckanapi
 
 
 # Uploads are put in this fake file system
@@ -77,7 +80,10 @@ class TestUpdateZip(object):
                 eq(datapackage[u'resources'], [{
                     u'format': u'CSV',
                     u'name': dataset['resources'][0]['id'],
-                    u'path': u'https://example.com/data.csv'}])
+                    u'path': csv_filename_in_zip,
+                    u'sources': [{u'path': u'https://example.com/data.csv',
+                                  u'title': None}],
+                    }])
 
     @helpers.change_config('ckan.storage_path', '/doesnt_exist')
     @responses.activate
@@ -101,3 +107,55 @@ class TestUpdateZip(object):
         zip_resources = [res for res in dataset['resources']
                          if res['name'] == u'All resource data']
         assert_equal(len(zip_resources), 1)
+
+    @helpers.change_config('ckan.storage_path', '/doesnt_exist')
+    @responses.activate
+    def test_uploaded_resource(self, _):
+        responses.add_passthru('http://127.0.0.1:8983/solr')
+        csv_content = u'Test,csv'
+        responses.add(
+            responses.GET,
+            re.compile(r'http://test.ckan.net/dataset/.*/download/.*'),
+            body=csv_content
+        )
+        dataset = factories.Dataset()
+        # add a resource which is an uploaded file
+        with tempfile.NamedTemporaryFile() as fp:
+            fp.write(csv_content)
+            fp.seek(0)
+            registry = ckanapi.LocalCKAN()
+            resource = dict(
+                package_id=dataset[u'id'],
+                url=u'dummy-value',
+                upload=fp,
+                name=u'Rainfall',
+                format=u'CSV'
+            )
+            registry.action.resource_create(**resource)
+
+        update_zip(dataset['id'])
+
+        dataset = helpers.call_action(u'package_show', id=dataset['id'])
+        zip_resources = [res for res in dataset['resources']
+                         if res['name'] == u'All resource data']
+        zip_resource = zip_resources[0]
+        uploader = ckan.lib.uploader.get_resource_uploader(zip_resource)
+        filepath = uploader.get_path(zip_resource[u'id'])
+        csv_filename_in_zip = u'rainfall.csv'
+        with fake_open(filepath, 'rb') as f:
+            with zipfile.ZipFile(f) as zip_:
+                # Check uploaded file
+                assert_equal(zip_.namelist(),
+                             [csv_filename_in_zip, 'datapackage.json'])
+                assert_equal(zip_.read(csv_filename_in_zip), 'Test,csv')
+                # Check datapackage.json
+                datapackage_json = zip_.read('datapackage.json')
+                datapackage = json.loads(datapackage_json)
+                eq(datapackage[u'resources'], [{
+                    u'format': u'CSV',
+                    u'name': u'rainfall',
+                    u'path': csv_filename_in_zip,
+                    u'sources': [{u'path': dataset['resources'][0]['url'],
+                                  u'title': u'Rainfall'}],
+                    u'title': u'Rainfall',
+                    }])

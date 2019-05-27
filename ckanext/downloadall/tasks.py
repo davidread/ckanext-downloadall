@@ -2,6 +2,7 @@ import tempfile
 import zipfile
 import os
 import hashlib
+import math
 
 import requests
 import ckanapi
@@ -36,6 +37,7 @@ def update_zip(package_id):
             url='dummy-value',
             upload=fp,
             name=u'All resource data',
+            format=u'ZIP',
             downloadall_metadata_modified=dataset['metadata_modified']
         )
 
@@ -80,10 +82,8 @@ def write_zip(fp, package_id):
             ckanapi.datapackage.populate_datastore_res_fields(
                 ckan=ckan, res=res)
 
-            # TODO deal with a resource of resource_type=file.upload
-
             log.debug('Downloading resource {}/{}: {}'
-                      .format(i + 1, len(dataset['resources']), res['url']))
+                      .format(i, len(dataset['resources']), res['url']))
             try:
                 r = requests.get(res['url'], stream=True)
             except requests.ConnectionError:
@@ -100,22 +100,35 @@ def write_zip(fp, package_id):
                 ckanapi.datapackage.resource_filename(dres)
 
             hash_object = hashlib.md5()
+            size = 0
             try:
                 # python3 syntax - stream straight into the zip
                 with zipf.open(filename, 'wb') as zf:
                     for chunk in r.iter_content(chunk_size=128):
                         zf.write(chunk)
                         hash_object.update(chunk)
+                        size += len(chunk)
             except RuntimeError:
                 # python2 syntax - need to save to disk first
                 with tempfile.NamedTemporaryFile() as datafile:
                     for chunk in r.iter_content(chunk_size=128):
                         datafile.write(chunk)
                         hash_object.update(chunk)
+                        size += len(chunk)
                     datafile.flush()
                     # .write() streams the file into the zip
                     zipf.write(datafile.name, arcname=filename)
             file_hash = hash_object.hexdigest()
+            log.debug('Downloaded {}, hash: {}'
+                      .format(format_bytes(size), file_hash))
+
+            # save path in datapackage.json
+            title = dres.get('title') or res.get('title') \
+                or res.get('name', '')
+            dres['sources'] = [{'title': title,
+                                'path': dres['path']}]
+            dres['path'] = filename
+
             # TODO optimize using the file_hash
             file_hash
         # TODO deal with a dataset with no resources
@@ -125,6 +138,7 @@ def write_zip(fp, package_id):
             json_file.write(ckanapi.cli.utils.pretty_json(datapackage))
             json_file.flush()
             zipf.write(json_file.name, arcname='datapackage.json')
+            log.debug('Added datapackage.json from {}'.format(json_file.name))
 
     statinfo = os.stat(fp.name)
     filesize = statinfo.st_size
@@ -132,6 +146,16 @@ def write_zip(fp, package_id):
     log.info('Zip created: {} {} bytes'.format(fp.name, filesize))
 
     return existing_zip_resource, filesize
+
+
+def format_bytes(size_bytes):
+   if size_bytes == 0:
+       return "0 bytes"
+   size_name = ("bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+   i = int(math.floor(math.log(size_bytes, 1024)))
+   p = math.pow(1024, i)
+   s = round(size_bytes / p, 1)
+   return '{} {}'.format(s, size_name[i])
 
 
 def remove_resources_that_should_not_be_included_in_the_datapackage(dataset):
