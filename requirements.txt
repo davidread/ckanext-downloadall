@@ -1,2 +1,1 @@
-# ckanapi - use master until 4.3 is released with #138
--e git+https://github.com/ckan/ckanapi.git#egg=ckanapi
+ckanapi>=4.3
