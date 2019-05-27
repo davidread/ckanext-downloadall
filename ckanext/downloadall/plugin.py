@@ -6,6 +6,7 @@ from ckan.lib.jobs import DEFAULT_QUEUE_NAME
 from ckan import model
 
 from tasks import update_zip
+import helpers
 
 
 log = __import__('logging').getLogger(__name__)
@@ -14,6 +15,7 @@ log = __import__('logging').getLogger(__name__)
 class DownloadallPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IDomainObjectModification)
+    plugins.implements(plugins.ITemplateHelpers)
 
     # IConfigurer
 
@@ -77,3 +79,10 @@ class DownloadallPlugin(plugins.SingletonPlugin):
             title=u'DownloadAll {} "{}" {}'.format(operation, dataset_name,
                                                    dataset_id),
             queue=queue)
+
+    # ITemplateHelpers
+
+    def get_helpers(self):
+        return {
+            'downloadall__pop_zip_resource': helpers.pop_zip_resource,
+        }
