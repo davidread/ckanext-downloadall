@@ -2,9 +2,16 @@
 
 import click
 
-from ckan.cli import (
-    click_config_option, load_config
-)
+try:
+    # CKAN 2.9+
+    from ckan.cli import (
+        click_config_option, load_config
+    )
+except ImportError:
+    # CKAN 2.7, 2.8
+    from ckan.lib.cli import click_config_option
+    from ckan.lib.cli import _get_config as load_config
+
 from ckan.config.middleware import make_app
 from ckan.plugins.toolkit import get_action
 from ckan import model
