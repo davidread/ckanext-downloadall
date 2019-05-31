@@ -96,6 +96,20 @@ None at present
 ..     ckanext.downloadall.some_setting = some_default_value
 
 
+----------------------
+Command-line interface
+----------------------
+
+There is a command-line interface::
+
+    downloadall --help
+
+Examples of use::
+
+    downloadall update-zip gold-prices
+    downloadall update-all-zips
+
+
 ------------------------
 Development Installation
 ------------------------

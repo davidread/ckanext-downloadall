@@ -27,7 +27,7 @@ def update_zip(package_id):
 
     prefix = "{}-".format(dataset[u'name'])
     with tempfile.NamedTemporaryFile(prefix=prefix, suffix='.zip') as fp:
-        existing_zip_resource, filesize = write_zip(fp, package_id)
+        existing_zip_resource, filesize = write_zip(fp, dataset['id'])
 
         # Upload resource to CKAN as a new/updated resource
         registry = ckanapi.LocalCKAN()

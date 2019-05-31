@@ -79,13 +79,17 @@ setup(
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
     # pip to create the appropriate form of executable for the target platform.
-    entry_points='''
-        [ckan.plugins]
-        downloadall=ckanext.downloadall.plugin:DownloadallPlugin
-
-        [babel.extractors]
-        ckan = ckan.lib.extract:extract_ckan
-    ''',
+    entry_points={
+        'ckan.plugins': [
+            'downloadall=ckanext.downloadall.plugin:DownloadallPlugin',
+        ],
+        'babel.extractors': [
+            'ckan = ckan.lib.extract:extract_ckan',
+        ],
+        'console_scripts': [
+            'downloadall = ckanext.downloadall.cli:cli',
+        ],
+    },
 
     # If you are changing from the default layout of your extension, you may
     # have to change the message extractors, you can read more about babel
