@@ -3,7 +3,7 @@
 import click
 
 from ckan.cli import (
-    click_config_option, load_config, config_tool
+    click_config_option, load_config
 )
 from ckan.config.middleware import make_app
 from ckan.plugins.toolkit import get_action
@@ -47,6 +47,7 @@ class CkanCommand(object):
 def cli(ctx, config, *args, **kwargs):
     ctx.obj = CkanCommand(config)
 
+
 @cli.command(u'update-zip', short_help=u'Update zip file for a dataset')
 @click.argument('dataset_ref')
 def update_zip(dataset_ref):
@@ -55,6 +56,7 @@ def update_zip(dataset_ref):
     Generates zip file for a dataset, downloading its resources.'''
     tasks.update_zip(dataset_ref)
     click.secho(u'update-zip: SUCCESS', fg=u'green', bold=True)
+
 
 @cli.command(u'update-all-zips',
              short_help=u'Update zip files for all datasets')
