@@ -13,8 +13,9 @@ except ImportError:
     from ckan.lib.cli import _get_config as load_config
 
 from ckan.config.middleware import make_app
-from ckan.plugins.toolkit import get_action
+import ckan.plugins.toolkit as toolkit
 from ckan import model
+from ckan.lib.jobs import DEFAULT_QUEUE_NAME
 
 import tasks
 
@@ -57,23 +58,47 @@ def cli(ctx, config, *args, **kwargs):
 
 @cli.command(u'update-zip', short_help=u'Update zip file for a dataset')
 @click.argument('dataset_ref')
-def update_zip(dataset_ref):
+@click.option(u'--synchronous', u'-s',
+              help=u'Do it in the same process (not the worker)',
+              is_flag=True)
+def update_zip(dataset_ref, synchronous):
     u''' update-zip <package-name>
 
     Generates zip file for a dataset, downloading its resources.'''
-    tasks.update_zip(dataset_ref)
+    if synchronous:
+        tasks.update_zip(dataset_ref)
+    else:
+        toolkit.enqueue_job(
+            tasks.update_zip, [dataset_ref],
+            title=u'DownloadAll {operation} "{name}" {id}'.format(
+                operation='cli-requested', name=dataset_ref,
+                id=dataset_ref),
+            queue=DEFAULT_QUEUE_NAME)
     click.secho(u'update-zip: SUCCESS', fg=u'green', bold=True)
 
 
 @cli.command(u'update-all-zips',
              short_help=u'Update zip files for all datasets')
-def update_all_zips():
+@click.option(u'--synchronous', u'-s',
+              help=u'Do it in the same process (not the worker)',
+              is_flag=True)
+def update_all_zips(synchronous):
     u''' update-all-zips <package-name>
 
     Generates zip file for all datasets. It is done synchronously.'''
     context = {'model': model, 'session': model.Session}
-    datasets = get_action('package_list')(context, {})
+    datasets = toolkit.get_action('package_list')(context, {})
     for i, dataset_name in enumerate(datasets):
-        print('Processing dataset {}/{}'.format(i + 1, len(datasets)))
-        tasks.update_zip(dataset_name)
+        if synchronous:
+            print('Processing dataset {}/{}'.format(i + 1, len(datasets)))
+            tasks.update_zip(dataset_name)
+        else:
+            print('Queuing dataset {}/{}'.format(i + 1, len(datasets)))
+            toolkit.enqueue_job(
+                tasks.update_zip, [dataset_name],
+                title=u'DownloadAll {operation} "{name}" {id}'.format(
+                    operation='cli-requested', name=dataset_name,
+                    id=dataset_name),
+                queue=DEFAULT_QUEUE_NAME)
+
     click.secho(u'update-all-zips: SUCCESS', fg=u'green', bold=True)
