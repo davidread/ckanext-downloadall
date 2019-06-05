@@ -75,6 +75,10 @@ To install ckanext-downloadall:
    config file (by default the config file is located at
    ``/etc/ckan/default/production.ini``).
 
+4. Restart the CKAN worker. For example if you've deployed it with supervisord::
+
+     sudo supervisorctl restart ckan-worker:ckan-worker-00
+
 4. Restart CKAN. For example if you've deployed CKAN with Apache on Ubuntu::
 
      sudo service apache2 reload
@@ -119,6 +123,13 @@ Troubleshooting
 This means you have an older version of ckanapi, which is a dependency of
 ckanext-downloadall. Install a newer version.
 
+**OSError: [Errno 13] Permission denied: '/data/ckan/resources/c89'**
+
+You are trying to update zips from the command-line but running the tasks
+synchronously, rather than with the normal worker process. In this case you
+need to run it as the `www-data` user e.g.::
+
+    sudo -u www-data /usr/lib/ckan/default/bin/downloadall -c /etc/ckan/default/production.ini update-all-zips --synchronous
 
 ------------------------
 Development Installation
