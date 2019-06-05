@@ -110,6 +110,16 @@ Examples of use::
     downloadall update-all-zips
 
 
+---------------
+Troubleshooting
+---------------
+
+**ImportError: No module named datapackage**
+
+This means you have an older version of ckanapi, which is a dependency of
+ckanext-downloadall. Install a newer version.
+
+
 ------------------------
 Development Installation
 ------------------------
