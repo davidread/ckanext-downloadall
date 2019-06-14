@@ -61,6 +61,8 @@ class DownloadallPlugin(plugins.SingletonPlugin):
             {'ignore_auth': True}, {'queues': [queue]})
         if jobs:
             for job in jobs:
+                if not job['title']:
+                    continue
                 match = re.match(
                     r'DownloadAll \w+ "[^"]*" ([\w-]+)', job[u'title'])
                 if match:
