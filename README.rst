@@ -79,7 +79,8 @@ To install ckanext-downloadall:
 
      sudo supervisorctl restart ckan-worker:ckan-worker-00
 
-4. Restart CKAN. For example if you've deployed CKAN with Apache on Ubuntu::
+5. Restart CKAN server. For example if you've deployed CKAN with Apache on
+   Ubuntu::
 
      sudo service apache2 reload
 
@@ -117,6 +118,11 @@ Examples of use::
 ---------------
 Troubleshooting
 ---------------
+
+**"All resource data" appears as a normal resource, instead of seeing a "Download All" button**
+
+You need to enable this extension in the CKAN config and restart the server.
+See the Installation section above.
 
 **ImportError: No module named datapackage**
 
