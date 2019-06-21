@@ -16,6 +16,7 @@ class DownloadallPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IDomainObjectModification)
     plugins.implements(plugins.ITemplateHelpers)
+    plugins.implements(plugins.IPackageController, inherit=True)
 
     # IConfigurer
 
@@ -88,3 +89,12 @@ class DownloadallPlugin(plugins.SingletonPlugin):
         return {
             'downloadall__pop_zip_resource': helpers.pop_zip_resource,
         }
+
+    # IPackageController
+
+    def before_index(self, pkg_dict):
+        if u'All resource data' in pkg_dict['res_name']:
+            # we've got a 'Download all zip', so remove it's ZIP from the SOLR
+            # facet of resource formats, as it's not really a data resource
+            pkg_dict['res_format'].remove('ZIP')
+        return pkg_dict
