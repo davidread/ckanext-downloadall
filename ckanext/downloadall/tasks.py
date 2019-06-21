@@ -85,6 +85,8 @@ def write_zip(fp, package_id):
 
             ckanapi.datapackage.populate_datastore_res_fields(
                 ckan=ckan, res=res)
+            ckanapi.datapackage.populate_schema_from_datastore(
+                cres=res, dres=dres)
 
             log.debug('Downloading resource {}/{}: {}'
                       .format(i, len(dataset['resources']), res['url']))
