@@ -1,0 +1,14 @@
+{% ckan_extends %}
+
+{% block resources_inner %}
+  {# We don't want to display here the 'download all' ZIP resource on the list of file types #}
+  {% set zip_resource = h.downloadall__pop_zip_resource(package) %}
+
+  {# This is the same as the original resources_inner. But we can't simply
+     call super() as it doesn't get the modified package #}
+  {% for resource in h.dict_list_reduce(package.resources, 'format') %}
+    <li>
+      <a href="{{ h.url_for('dataset.read', id=package.name) }}" class="label label-default" data-format="{{ resource.lower() }}">{{ resource }}</a>
+    </li>
+  {% endfor %}
+{% endblock %}
