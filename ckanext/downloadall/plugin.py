@@ -39,12 +39,25 @@ class DownloadallPlugin(plugins.SingletonPlugin):
 
         log.debug(u'{} {} \'{}\''
                   .format(operation, type(entity).__name__, entity.name))
+        # We should regenerate zip if these happen:
+        # 1 change of title, description etc (goes into package.json)
+        # 2 add/change/delete resource metadata
+        # 3 change resource data by upload (results in URL change)
+        # 4 change resource data by remote data
+        # BUT not:
+        # 5 if this was just an update of the Download All zip itself
+        #   (or you get an infinite loop)
+        #
+        # 4 - we're ignoring this for now (ideally new data means a new URL)
+        # 1&2&3 - will change package.json and notify(res) and possibly
+        #         notify(package) too
+        # 5 - will cause these notifies but package.json only in limit places
+        #
+        # SO if package.json (not including Package Zip bits) remains the same
+        # then we don't need to regenerate zip.
         if isinstance(entity, model.Package):
-            # don't need to know about changes to the package, just its
-            # resources. Indeed change to the zip resource also trigger a
-            # notify() on the package, and reacting would cause an infinite
-            # loop
-            return
+            dataset_name = entity.name
+            dataset_id = entity.id
         elif isinstance(entity, model.Resource):
             if entity.extras.get('downloadall_metadata_modified'):
                 # this is the zip of all the resources - no need to react to

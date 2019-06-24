@@ -3,6 +3,7 @@ import zipfile
 import json
 import tempfile
 import re
+import copy
 
 import mock
 from nose.tools import assert_equal
@@ -12,7 +13,9 @@ import requests
 
 from ckan.tests import factories, helpers
 import ckan.lib.uploader
-from ckanext.downloadall.tasks import update_zip
+from ckanext.downloadall.tasks import (
+    update_zip, canonized_datapackage, save_local_path_in_datapackage_resource,
+    hash_datapackage)
 import ckanapi
 
 
@@ -31,6 +34,32 @@ def mock_open_if_open_fails(*args, **kwargs):
         return real_open(*args, **kwargs)
     except (OSError, IOError):
         return fake_open(*args, **kwargs)
+
+
+def mock_populate_datastore_res_fields(ckan, res):
+    res['datastore_fields'] = [{u'type': u'int', u'id': u'_id'},
+                               {u'type': u'text', u'id': u'Date'},
+                               {u'type': u'text', u'id': u'Price'}]
+
+
+def mock_populate_datastore_res_fields_overridden(ckan, res):
+    res['datastore_fields'] = [
+        {u'type': u'int', u'id': u'_id'},
+        {
+            u'type': u'timestamp',
+            u'id': u'Date',
+            u'info': {
+                u'notes': u'Some description here!',
+                u'type_override': u'timestamp',
+                u'label': u'The Date'
+            },
+        },
+        {
+            u'type': u'numeric',
+            u'id': u'Price',
+            u'info': {u'notes': u'', u'type_override': u'', u'label': u''},
+        }
+    ]
 
 
 @mock.patch.object(ckan.lib.uploader, 'os', fake_os)
@@ -101,13 +130,99 @@ class TestUpdateZip(object):
             }])
 
         update_zip(dataset['id'])
-        update_zip(dataset['id'])
+        update_zip(dataset['id'], skip_if_no_changes=False)
 
-        # ensure the zip isn't included in the zip the second time
+        # ensure a second zip hasn't been added
         dataset = helpers.call_action(u'package_show', id=dataset['id'])
         zip_resources = [res for res in dataset['resources']
                          if res['name'] == u'All resource data']
         assert_equal(len(zip_resources), 1)
+
+    @helpers.change_config('ckan.storage_path', '/doesnt_exist')
+    @responses.activate
+    def test_dont_skip_if_no_changes(self, _):
+        # i.e. testing skip_if_no_changes=False
+        responses.add(
+            responses.GET,
+            'https://example.com/data.csv',
+            body='a,b,c'
+        )
+        responses.add_passthru('http://127.0.0.1:8983/solr')
+        dataset = factories.Dataset(resources=[{
+            'url': 'https://example.com/data.csv',
+            'format': 'csv',
+            }])
+
+        update_zip(dataset['id'])
+        with mock.patch('ckanext.downloadall.tasks.write_zip') as write_zip_:
+            update_zip(dataset['id'], skip_if_no_changes=False)
+            # ensure zip would be rewritten in this case - not letting it skip
+            assert write_zip_.called
+
+    @helpers.change_config('ckan.storage_path', '/doesnt_exist')
+    @responses.activate
+    def test_update_twice_skipping_second_time(self, _):
+        # i.e. testing skip_if_no_changes=False
+        responses.add(
+            responses.GET,
+            'https://example.com/data.csv',
+            body='a,b,c'
+        )
+        responses.add_passthru('http://127.0.0.1:8983/solr')
+        dataset = factories.Dataset(resources=[{
+            'url': 'https://example.com/data.csv',
+            'format': 'csv',
+            }])
+
+        update_zip(dataset['id'])
+        with mock.patch('ckanext.downloadall.tasks.write_zip') as write_zip_:
+            update_zip(dataset['id'], skip_if_no_changes=True)
+            # nothings changed, so it shouldn't rewrite the zip
+            assert not write_zip_.called
+
+    @helpers.change_config('ckan.storage_path', '/doesnt_exist')
+    @responses.activate
+    def test_changing_description_causes_zip_to_update(self, _):
+        responses.add(
+            responses.GET,
+            'https://example.com/data.csv',
+            body='a,b,c'
+        )
+        responses.add_passthru('http://127.0.0.1:8983/solr')
+        dataset = factories.Dataset(resources=[{
+            'url': 'https://example.com/data.csv',
+            'format': 'csv',
+            }])
+
+        update_zip(dataset['id'])
+        dataset = helpers.call_action(u'package_patch', id=dataset['id'],
+                                      notes='New notes')
+        with mock.patch('ckanext.downloadall.tasks.write_zip') as write_zip_:
+            update_zip(dataset['id'], skip_if_no_changes=True)
+            # ensure zip would be rewritten in this case - not letting it skip
+            assert write_zip_.called
+
+    @helpers.change_config('ckan.storage_path', '/doesnt_exist')
+    @responses.activate
+    def test_deleting_resource_causes_zip_to_update(self, _):
+        responses.add(
+            responses.GET,
+            'https://example.com/data.csv',
+            body='a,b,c'
+        )
+        responses.add_passthru('http://127.0.0.1:8983/solr')
+        dataset = factories.Dataset(resources=[{
+            'url': 'https://example.com/data.csv',
+            'format': 'csv',
+            }])
+
+        update_zip(dataset['id'])
+        dataset = helpers.call_action(u'package_patch', id=dataset['id'],
+                                      resources=[])
+        with mock.patch('ckanext.downloadall.tasks.write_zip') as write_zip_:
+            update_zip(dataset['id'], skip_if_no_changes=True)
+            # ensure zip would be rewritten in this case - not letting it skip
+            assert write_zip_.called
 
     @helpers.change_config('ckan.storage_path', '/doesnt_exist')
     @responses.activate
@@ -160,6 +275,45 @@ class TestUpdateZip(object):
                                   u'title': u'Rainfall'}],
                     u'title': u'Rainfall',
                     }])
+
+    @mock.patch('ckanapi.datapackage.populate_datastore_res_fields',
+                side_effect=mock_populate_datastore_res_fields)
+    @helpers.change_config('ckan.storage_path', '/doesnt_exist')
+    @responses.activate
+    def test_data_dictionary(self, _, __):
+        responses.add(
+            responses.GET,
+            'https://example.com/data.csv',
+            body='Date,Price\n1/6/2017,4.00\n2/6/2017,4.12'
+        )
+        responses.add_passthru('http://127.0.0.1:8983/solr')
+        dataset = factories.Dataset(resources=[{
+            'url': 'https://example.com/data.csv',
+            'format': 'csv',
+            }])
+
+        update_zip(dataset['id'])
+
+        dataset = helpers.call_action(u'package_show', id=dataset['id'])
+        zip_resources = [res for res in dataset['resources']
+                         if res['name'] == u'All resource data']
+        assert_equal(len(zip_resources), 1)
+        zip_resource = zip_resources[0]
+        assert_equal(zip_resource['url_type'], 'upload')
+
+        uploader = ckan.lib.uploader.get_resource_uploader(zip_resource)
+        filepath = uploader.get_path(zip_resource[u'id'])
+        csv_filename_in_zip = '{}.csv'.format(dataset['resources'][0]['id'])
+        with fake_open(filepath, 'rb') as f:
+            with zipfile.ZipFile(f) as zip_:
+                assert_equal(zip_.namelist(),
+                             [csv_filename_in_zip, 'datapackage.json'])
+                datapackage_json = zip_.read('datapackage.json')
+                assert datapackage_json.startswith('{\n  "description"')
+                datapackage = json.loads(datapackage_json)
+                eq(datapackage['resources'][0][u'schema'],
+                   {'fields': [{'type': 'string', 'name': u'Date'},
+                               {'type': 'string', 'name': u'Price'}]})
 
     @helpers.change_config('ckan.storage_path', '/doesnt_exist')
     @responses.activate
@@ -238,3 +392,182 @@ class TestUpdateZip(object):
                     u'path': 'https://example.com/data.csv',
                     u'title': u'rainfall',
                     }])
+
+
+local_datapackage = {
+    "license": {
+        "title": "Creative Commons Attribution",
+        "type": "cc-by",
+        "url": "http://www.opendefinition.org/licenses/cc-by"
+    },
+    "name": "test",
+    "resources": [
+        {
+            "format": "CSV",
+            "name": "annual-csv",
+            "path": "annual-.csv",
+            "schema": {
+                "fields": [
+                    {
+                        "description": "Some description here!",
+                        "name": "Date",
+                        "title": "The Date",
+                        "type": "datetime"
+                    },
+                    {
+                        "name": "Price",
+                        "type": "number"
+                    }
+                ]
+            },
+            "sources": [
+                {
+                    "path": "https://sample.com/annual.csv",
+                    "title": "annual.csv"
+                }
+            ],
+            "title": "annual.csv"
+        },
+        {
+            "format": "CSV",
+            "name": "annual-csv0",
+            "path": "annual-csv0.csv",
+            "schema": {
+                "fields": [
+                    {
+                        "name": "Date",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Price",
+                        "type": "string"
+                    }
+                ]
+            },
+            "sources": [
+                {
+                    "path": "https://sample.com/annual.csv",
+                    "title": "annual.csv"
+                }
+            ],
+            "title": "annual.csv"
+        }
+    ],
+    "title": "Gold Prices"
+}
+remote_datapackage = {
+    "license": {
+        "title": "Creative Commons Attribution",
+        "type": "cc-by",
+        "url": "http://www.opendefinition.org/licenses/cc-by"
+    },
+    "name": "test",
+    "resources": [
+        {
+            "format": "CSV",
+            "name": "annual-csv",
+            "path": "https://sample.com/annual.csv",
+            "schema": {
+                "fields": [
+                    {
+                        "description": "Some description here!",
+                        "name": "Date",
+                        "title": "The Date",
+                        "type": "datetime"
+                    },
+                    {
+                        "name": "Price",
+                        "type": "number"
+                    }
+                ]
+            },
+            "title": "annual.csv"
+        },
+        {
+            "format": "CSV",
+            "name": "annual-csv0",
+            "path": "https://sample.com/annual.csv",
+            "schema": {
+                "fields": [
+                    {
+                        "name": "Date",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Price",
+                        "type": "string"
+                    }
+                ]
+            },
+            "title": "annual.csv"
+        }
+    ],
+    "title": "Gold Prices"
+}
+
+
+class TestCanonizedDataPackage(object):
+    def test_canonize_local_datapackage(self):
+        eq(canonized_datapackage(local_datapackage), remote_datapackage)
+
+    def test_canonize_remote_datapackage(self):
+        eq(canonized_datapackage(remote_datapackage), remote_datapackage)
+
+
+class TestSaveLocalPathInDatapackageResource(object):
+    def test_convert_remote_to_local(self):
+        datapackage = copy.deepcopy(remote_datapackage)
+        res = {'title': 'Gold Price Annual'}
+        save_local_path_in_datapackage_resource(
+            datapackage['resources'][0], res, 'annual-.csv')
+        save_local_path_in_datapackage_resource(
+            datapackage['resources'][1], res, 'annual-csv0.csv')
+        eq(datapackage, local_datapackage)
+
+
+class TestHashDataPackage(object):
+    def test_repeatability(self):
+        # value of the hash shouldn't change between machines or python
+        # versions etc
+        eq(hash_datapackage({'resources': []}),
+           '60482792d5032e490cdde4f759e84fd6')
+
+    def test_dict_ordering(self):
+        eq(hash_datapackage({'resources': [{'format': u'CSV', 'name': u'a'}]}),
+           hash_datapackage({'resources': [{'name': u'a', 'format': u'CSV'}]}))
+
+
+# helpers
+
+def zip_filepath(dataset):
+    dataset = helpers.call_action(u'package_show',
+                                  id=dataset['id'])
+    zip_resources = [res for res in dataset['resources']
+                     if res['name'] == u'All resource data']
+    zip_resource = zip_resources[0]
+    uploader = ckan.lib.uploader.get_resource_uploader(zip_resource)
+    return uploader.get_path(zip_resource[u'id'])
+
+
+class DataPackageZip(object):
+    '''Opens the zipfile for the given dataset, so you can test its contents'''
+    def __init__(self, dataset):
+        self.dataset = dataset
+
+    def __enter__(self):
+        filepath = zip_filepath(self.dataset)
+        self.f = open(filepath, 'rb')
+        self.zip = zipfile.ZipFile(self.f)
+        return self.zip
+
+    def __exit__(self, ext, exv, trb):
+        self.zip.close()
+        self.f.close()
+
+
+def extract_datapackage_json(dataset):
+    with DataPackageZip(dataset) as zip_:
+        assert 'datapackage.json' in zip_.namelist()
+        datapackage_json = zip_.read('datapackage.json')
+        datapackage = json.loads(datapackage_json)
+        return datapackage

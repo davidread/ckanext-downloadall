@@ -40,8 +40,51 @@ class TestNotify(object):
             [u'DownloadAll changed "{}" {}'
              .format(dataset['name'], dataset['id'])])
 
-    def test_creation_of_zip_resource_doesnt_lead_to_queued_task(self):
-        # otherwise we'd get an infinite loop
+    def test_deleted_resource_leads_to_queued_task(self):
+        dataset = factories.Dataset(resources=[
+            {'url': 'http://some.image.png', 'format': 'png'}])
+        helpers.call_action(u'job_clear')
+
+        dataset['resources'] = []
+        helpers.call_action(u'package_update', **dataset)
+
+        assert_equal(
+            [job['title'] for job in helpers.call_action(u'job_list')],
+            [u'DownloadAll changed "{}" {}'
+             .format(dataset['name'], dataset['id'])])
+
+    def test_created_dataset_leads_to_queued_task(self):
+        dataset = {'name': 'testdataset_da',
+                   'title': 'Test Dataset',
+                   'notes': 'Just another test dataset.',
+                   'resources': [
+                        {'url': 'http://some.image.png', 'format': 'png'}
+                   ]}
+        dataset = helpers.call_action(u'package_create', **dataset)
+        # this should prompt datapackage.json to be updated
+
+        assert_equal(
+            [job['title'] for job in helpers.call_action(u'job_list')],
+            [u'DownloadAll new "{}" {}'
+             .format(dataset['name'], dataset['id'])])
+
+    def test_changed_dataset_leads_to_queued_task(self):
+        dataset = factories.Dataset(resources=[
+            {'url': 'http://some.image.png', 'format': 'png'}])
+        helpers.call_action(u'job_clear')
+
+        dataset['notes'] = 'Changed description'
+        helpers.call_action(u'package_update', **dataset)
+        # this should prompt datapackage.json to be updated
+
+        assert_equal(
+            [job['title'] for job in helpers.call_action(u'job_list')],
+            [u'DownloadAll changed "{}" {}'
+             .format(dataset['name'], dataset['id'])])
+
+    def test_creation_of_zip_resource_leads_to_queued_task(self):
+        # but we don't get an infinite loop because it is stopped by the
+        # skip_if_no_changes
         dataset = factories.Dataset(resources=[
             {'url': 'http://some.image.png', 'format': 'png'}])
         helpers.call_action(u'job_clear')
@@ -55,10 +98,10 @@ class TestNotify(object):
 
         assert_equal(
             [job['title'] for job in helpers.call_action(u'job_list')],
-            [])
+            [u'DownloadAll changed "{}" {}'
+             .format(dataset['name'], dataset['id'])])
 
     def test_other_instance_types_do_nothing(self):
-        factories.Dataset()  # without resources
         factories.User()
         factories.Organization()
         factories.Group()
