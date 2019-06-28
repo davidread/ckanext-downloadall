@@ -106,8 +106,13 @@ class DownloadallPlugin(plugins.SingletonPlugin):
     # IPackageController
 
     def before_index(self, pkg_dict):
-        if u'All resource data' in pkg_dict['res_name']:
-            # we've got a 'Download all zip', so remove it's ZIP from the SOLR
-            # facet of resource formats, as it's not really a data resource
-            pkg_dict['res_format'].remove('ZIP')
+        try:
+            if u'All resource data' in pkg_dict['res_name']:
+                # we've got a 'Download all zip', so remove it's ZIP from the
+                # SOLR facet of resource formats, as it's not really a data
+                # resource
+                pkg_dict['res_format'].remove('ZIP')
+        except KeyError:
+            # this happens when you save a new package without a resource yet
+            pass
         return pkg_dict
