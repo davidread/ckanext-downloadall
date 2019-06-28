@@ -1,0 +1,9 @@
+{#
+    Don't display the Download All ZIP resource
+#}
+{% set zip_res = h.downloadall__pop_zip_resource(pkg) %}
+
+{#
+    The rest is the same as ckan/templates/package/snippets/resources.html
+#}
+{% ckan_extends %}
