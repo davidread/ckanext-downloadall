@@ -30,17 +30,36 @@ a zip file containing all the resource files and a datapackage.json.
 
 .. image:: demo.png
 
+This zip file is a good way to package data for storing or sending, because:
+
+* you keep all the data files together
+
+* you include the documentation (metadata) - avoids the common problem of being
+  handed some data files and not know anything about it or where to find info
+
+* the metadata is machine-readable, so can be used by tools, software and in
+  automated workflows. For example:
+
+  * validating a series of data releases all meet a standard schema
+  * loading it into a database, using the column types and foreign key
+    relations specified in the metadata
+
 The `datapackage.json <https://frictionlessdata.io/specs/data-package/>`_ is a
 `Frictionless Data <https://frictionlessdata.io/specs/data-package/>`_
 standard, also known as a Data Package.
 
-If the resource is pushed/xloaded to Datastore then the schema (column types)
-are included in the datapackage.json file.
+
+Technical notes
+~~~~~~~~~~~~~~~
+
+If the resource is pushed/xloaded to DataStore then the schema (column types)
+is also included in the datapackage.json file.
 
 This extension uses a CKAN background job to create the zip every time a
-dataset is created or updated. This suits CKANs where all files are uploaded -
-if the underlying data file changes without CKAN knowing about it, then the zip
-will not include the update.
+dataset is created or updated (or its data dictionary is changed). This suits
+CKANs where all files are uploaded - if the underlying data file changes
+without the CKAN URL changing, then the zip will not include the update (until
+something else triggers the zip to update).
 
 (This extension is inspired by `ckanext-packagezip
 <https://github.com/datagovuk/ckanext-packagezip>`_, but that is old and relied
@@ -52,14 +71,14 @@ Requirements
 
 Designed to work with CKAN 2.7+
 
+Ideally it is used in conjunction with DataStore and
+`xloader<https://github.com/ckan/ckanext-xloader>` (or datapusher), so that the
+Data Dictionary is included as a schema in the datapackage.json, to describe
+the column types.
 
 ------------
 Installation
 ------------
-
-.. Add any additional install steps to the list below.
-   For example installing any non-Python dependencies or adding any required
-   config settings.
 
 To install ckanext-downloadall:
 
@@ -73,7 +92,9 @@ To install ckanext-downloadall:
 
 3. Add ``downloadall`` to the ``ckan.plugins`` setting in your CKAN
    config file (by default the config file is located at
-   ``/etc/ckan/default/production.ini``).
+   ``/etc/ckan/default/production.ini``). e.g. ::
+
+     ckan.plugins = downloadall
 
 4. Restart the CKAN worker. For example if you've deployed it with supervisord::
 
@@ -84,7 +105,7 @@ To install ckanext-downloadall:
 
      sudo service apache2 reload
 
-Ensure the background job 'worker' process is running - see
+6. Ensure the background job 'worker' process is running - see
 https://docs.ckan.org/en/2.8/maintaining/background-tasks.html#running-background-jobs
 
 
@@ -119,7 +140,8 @@ Examples of use::
 Troubleshooting
 ---------------
 
-**"All resource data" appears as a normal resource, instead of seeing a "Download All" button**
+**"All resource data" appears as a normal resource, instead of seeing a
+"Download All" button**
 
 You need to enable this extension in the CKAN config and restart the server.
 See the Installation section above.
