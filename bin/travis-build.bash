@@ -40,7 +40,9 @@ cd -
 
 echo "Creating the PostgreSQL user and database..."
 sudo -u postgres psql -c "CREATE USER ckan_default WITH PASSWORD 'pass';"
+sudo -u postgres psql -c "CREATE USER datastore_default WITH PASSWORD 'pass';"
 sudo -u postgres psql -c 'CREATE DATABASE ckan_test WITH OWNER ckan_default;'
+sudo -u postgres psql -c 'CREATE DATABASE datastore_test WITH OWNER ckan_default;'
 
 echo "Setting up Solr..."
 # Solr is multicore for tests on ckan master, but it's easier to run tests on
@@ -53,6 +55,7 @@ sudo service jetty restart
 echo "Initialising the database..."
 cd ckan
 paster db init -c test-core.ini
+paster datastore set-permissions -c test-core.ini | sudo -u postgres psql
 cd -
 
 echo "Installing ckanext-downloadall and its requirements..."
