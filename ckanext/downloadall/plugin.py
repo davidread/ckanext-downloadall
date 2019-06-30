@@ -7,6 +7,7 @@ from ckan import model
 
 from tasks import update_zip
 import helpers
+import action
 
 
 log = __import__('logging').getLogger(__name__)
@@ -17,6 +18,7 @@ class DownloadallPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IDomainObjectModification)
     plugins.implements(plugins.ITemplateHelpers)
     plugins.implements(plugins.IPackageController, inherit=True)
+    plugins.implements(plugins.IActions)
 
     # IConfigurer
 
@@ -56,45 +58,17 @@ class DownloadallPlugin(plugins.SingletonPlugin):
         # SO if package.json (not including Package Zip bits) remains the same
         # then we don't need to regenerate zip.
         if isinstance(entity, model.Package):
-            dataset_name = entity.name
-            dataset_id = entity.id
+            enqueue_update_zip(entity.name, entity.id, operation)
         elif isinstance(entity, model.Resource):
             if entity.extras.get('downloadall_metadata_modified'):
                 # this is the zip of all the resources - no need to react to
                 # it being changed
                 log.debug('Ignoring change to zip resource')
                 return
-            dataset_name = entity.related_packages()[0].name
-            dataset_id = entity.related_packages()[0].id
+            dataset = entity.related_packages()[0]
+            enqueue_update_zip(dataset.name, dataset.id, operation)
         else:
             return
-
-        # skip task if the dataset is already queued
-        queue = DEFAULT_QUEUE_NAME
-        jobs = toolkit.get_action('job_list')(
-            {'ignore_auth': True}, {'queues': [queue]})
-        if jobs:
-            for job in jobs:
-                if not job['title']:
-                    continue
-                match = re.match(
-                    r'DownloadAll \w+ "[^"]*" ([\w-]+)', job[u'title'])
-                if match:
-                    queued_dataset_id = match.groups()[0]
-                    if dataset_id == queued_dataset_id:
-                        log.info('Already queued dataset: {} {}'
-                                 .format(dataset_name, dataset_id))
-                        return
-
-        # add this dataset to the queue
-        log.debug(u'Queuing job update_zip: {} {}'
-                  .format(operation, dataset_name))
-
-        toolkit.enqueue_job(
-            update_zip, [dataset_id],
-            title=u'DownloadAll {} "{}" {}'.format(operation, dataset_name,
-                                                   dataset_id),
-            queue=queue)
 
     # ITemplateHelpers
 
@@ -116,3 +90,42 @@ class DownloadallPlugin(plugins.SingletonPlugin):
             # this happens when you save a new package without a resource yet
             pass
         return pkg_dict
+
+    # IActions
+
+    def get_actions(self):
+        actions = {}
+        if plugins.get_plugin('datastore'):
+            # datastore is enabled, so we need to chain the datastore_create
+            # action, to update the zip when it is called
+            actions['datastore_create'] = action.datastore_create
+        return actions
+
+
+def enqueue_update_zip(dataset_name, dataset_id, operation):
+    # skip task if the dataset is already queued
+    queue = DEFAULT_QUEUE_NAME
+    jobs = toolkit.get_action('job_list')(
+        {'ignore_auth': True}, {'queues': [queue]})
+    if jobs:
+        for job in jobs:
+            if not job['title']:
+                continue
+            match = re.match(
+                r'DownloadAll \w+ "[^"]*" ([\w-]+)', job[u'title'])
+            if match:
+                queued_dataset_id = match.groups()[0]
+                if dataset_id == queued_dataset_id:
+                    log.info('Already queued dataset: {} {}'
+                             .format(dataset_name, dataset_id))
+                    return
+
+    # add this dataset to the queue
+    log.debug(u'Queuing job update_zip: {} {}'
+              .format(operation, dataset_name))
+
+    toolkit.enqueue_job(
+        update_zip, [dataset_id],
+        title=u'DownloadAll {} "{}" {}'.format(operation, dataset_name,
+                                               dataset_id),
+        queue=queue)
