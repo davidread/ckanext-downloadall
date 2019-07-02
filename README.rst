@@ -72,7 +72,7 @@ Requirements
 Designed to work with CKAN 2.7+
 
 Ideally it is used in conjunction with DataStore and
-`xloader<https://github.com/ckan/ckanext-xloader>` (or datapusher), so that the
+`xloader <https://github.com/ckan/ckanext-xloader>`_ (or datapusher), so that the
 Data Dictionary is included as a schema in the datapackage.json, to describe
 the column types.
 
@@ -113,13 +113,10 @@ https://docs.ckan.org/en/2.8/maintaining/background-tasks.html#running-backgroun
 Config Settings
 ---------------
 
-None at present
-
-.. Document any optional config settings here. For example::
-
-..     # The minimum number of hours to wait before re-checking a resource
-..     # (optional, default: 24).
-..     ckanext.downloadall.some_setting = some_default_value
+    # Include additional fields from the dataset in the datapackage.json (e.g.
+    # those defined in a ckanext-scheming schema)
+    # (optional, space separated list).
+    ckanext.downloadall.dataset_fields_to_add_to_datapackage = district county
 
 
 ----------------------
