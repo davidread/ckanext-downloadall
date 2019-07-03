@@ -5,7 +5,7 @@ def pop_zip_resource(pkg):
     '''
     zip_res = None
     non_zip_resources = []
-    for res in pkg['resources']:
+    for res in pkg.get('resources', []):
         if res.get('downloadall_metadata_modified'):
             zip_res = res
         else:
