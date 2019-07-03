@@ -11,7 +11,7 @@ import ckanapi
 import ckanapi.datapackage
 
 from ckan import model
-from ckan.plugins.toolkit import get_action
+from ckan.plugins.toolkit import get_action, config
 
 
 log = __import__('logging').getLogger(__name__)
@@ -170,6 +170,13 @@ def generate_datapackage_json(package_id):
             ckan=local_ckan, res=res)
         ckanapi.datapackage.populate_schema_from_datastore(
             cres=res, dres=datapackage_res)
+
+    # add in any other dataset fields, if configured
+    fields_to_include = config.get(
+        u'ckanext.downloadall.dataset_fields_to_add_to_datapackage',
+        u'').split()
+    for key in fields_to_include:
+        datapackage[key] = dataset.get(key)
 
     return (datapackage, ckan_and_datapackage_resources,
             existing_zip_resource)

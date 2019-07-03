@@ -15,7 +15,7 @@ from ckan.tests import factories, helpers
 import ckan.lib.uploader
 from ckanext.downloadall.tasks import (
     update_zip, canonized_datapackage, save_local_path_in_datapackage_resource,
-    hash_datapackage)
+    hash_datapackage, generate_datapackage_json)
 import ckanapi
 
 
@@ -537,6 +537,78 @@ class TestHashDataPackage(object):
            hash_datapackage({'resources': [{'name': u'a', 'format': u'CSV'}]}))
 
 
+class TestGenerateDatapackageJson(object):
+    @classmethod
+    def setupClass(cls):
+        helpers.reset_db()
+
+    def test_simple(self):
+        dataset = factories.Dataset(resources=[{
+            'url': 'https://example.com/data.csv',
+            'format': 'csv',
+            }])
+
+        datapackage, ckan_and_datapackage_resources, existing_zip_resource = \
+            generate_datapackage_json(dataset['id'])
+
+        replace_number_suffix(datapackage, 'name')
+        replace_uuid(datapackage['resources'][0], 'name')
+        eq(datapackage, {
+            'description': u'Just another test dataset.',
+            'name': u'test_dataset_num',
+            'resources': [{'format': u'CSV',
+                           'name': u'<SOME-UUID>',
+                           'path': u'https://example.com/data.csv'}],
+            'title': u'Test Dataset'
+            })
+        eq(ckan_and_datapackage_resources[0][0][u'url'],
+           u'https://example.com/data.csv')
+        eq(ckan_and_datapackage_resources[0][0][u'description'],
+           u'')
+        eq(ckan_and_datapackage_resources[0][1], {
+            'format': u'CSV',
+            'name': u'<SOME-UUID>',
+            'path': u'https://example.com/data.csv'
+        })
+        eq(existing_zip_resource, None)
+
+    def test_extras(self):
+        dataset = factories.Dataset(extras=[
+            {u'key': u'extra1', u'value': u'1'},
+            {u'key': u'extra2', u'value': u'2'},
+            {u'key': u'extra3', u'value': u'3'},
+        ])
+
+        datapackage, _, __ = \
+            generate_datapackage_json(dataset['id'])
+
+        replace_number_suffix(datapackage, 'name')
+        eq(datapackage, {
+            'description': u'Just another test dataset.',
+            'name': u'test_dataset_num',
+            'title': u'Test Dataset',
+            'extras': {u'extra1': 1, u'extra2': 2, u'extra3': 3},
+            })
+
+    @helpers.change_config(
+        'ckanext.downloadall.dataset_fields_to_add_to_datapackage',
+        'num_resources type')
+    def test_added_fields(self):
+        dataset = factories.Dataset()
+
+        datapackage, _, __ = \
+            generate_datapackage_json(dataset['id'])
+
+        replace_number_suffix(datapackage, 'name')
+        eq(datapackage, {
+            'description': u'Just another test dataset.',
+            'name': u'test_dataset_num',
+            'title': u'Test Dataset',
+            'num_resources': 0,
+            'type': u'dataset',
+            })
+
+
 # helpers
 
 def zip_filepath(dataset):
@@ -571,3 +643,19 @@ def extract_datapackage_json(dataset):
         datapackage_json = zip_.read('datapackage.json')
         datapackage = json.loads(datapackage_json)
         return datapackage
+
+
+def replace_uuid(dict_, key):
+    assert key in dict_
+    dict_[key] = u'<SOME-UUID>'
+
+
+def replace_datetime(dict_, key):
+    assert key in dict_
+    dict_[key] = u'2019-05-24T15:52:30.123456'
+
+
+def replace_number_suffix(dict_, key):
+    # e.g. "Test Dataset 23" -> "Test Dataset "
+    assert key in dict_
+    dict_[key] = re.sub(r'\d+$', 'num', dict_[key])
