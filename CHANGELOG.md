@@ -6,8 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.1.0] - 2019-11-12
+
 ### Added
 - Config option added: ckanext.downloadall.dataset_fields_to_add_to_datapackage for including custom fields from the dataset in the datapackage.json
+
+### Fixed
+- Fixed home page exception KeyError: 'resources'
 
 ## [0.0.2] - 2019-06-30
 ### Added
