@@ -3,6 +3,8 @@ import re
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
 from ckan.lib.jobs import DEFAULT_QUEUE_NAME
+from ckan.lib.plugins import DefaultTranslation
+
 from ckan import model
 
 from tasks import update_zip
@@ -13,7 +15,8 @@ import action
 log = __import__('logging').getLogger(__name__)
 
 
-class DownloadallPlugin(plugins.SingletonPlugin):
+class DownloadallPlugin(plugins.SingletonPlugin, DefaultTranslation):
+    plugins.implements(plugins.ITranslation)
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IDomainObjectModification)
     plugins.implements(plugins.ITemplateHelpers)
