@@ -1,0 +1,29 @@
+# French translations for ckanext-downloadall.
+# Copyright (C) 2019 ORGANIZATION
+# This file is distributed under the same license as the ckanext-downloadall
+# project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ckanext-downloadall 0.1.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2019-11-27 09:54+0000\n"
+"PO-Revision-Date: 2019-11-27 09:54+0000\n"
+"Last-Translator: m431m\n"
+"Language: fr\n"
+"Language-Team: fr <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n > 1)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.3.4\n"
+
+#: ckanext/downloadall/templates/package/read.html:12
+msgid "This download is not currently available"
+msgstr "Le téléchargement n'est pas disponible actuellement"
+
+#: ckanext/downloadall/templates/package/read.html:14
+msgid "Download all"
+msgstr "Tout télécharger"
+

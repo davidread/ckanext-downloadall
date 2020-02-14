@@ -9,7 +9,7 @@
       {% if zip_res %}
         <a class="btn btn-primary resource-url-analytics resource-type-{{ zip_res.resource_type }}" href="{{ zip_res.url }}">
       {% else %}
-        <a class="btn btn-primary" disabled="disabled" title="This download is not currently available" href="#">
+        <a class="btn btn-primary" disabled="disabled" title="{{ _('This download is not currently available') }}" href="#">
       {% endif %}
           <i class="fa fa-arrow-circle-o-down"></i> {{ _('Download all') }}
         </a>
