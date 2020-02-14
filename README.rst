@@ -69,6 +69,15 @@ on ckanext-archiver and IPipe.)
 Requirements
 ------------
 
+=============== =============
+CKAN version    Compatibility
+=============== =============
+2.6 and earlier don't know
+2.7             yes
+2.8             yes
+2.9             no - needs updating
+=============== =============
+
 Designed to work with CKAN 2.7+
 
 Ideally it is used in conjunction with DataStore and
